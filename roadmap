@@ -1,0 +1,52 @@
+Phase 1 — Fondations du projet
+
+Structurer les dossiers (routes/, db/, models/, errors/)
+Configurer main.rs avec Axum + pool SQLx + état partagé (AppState)
+Gestion des erreurs globale et logs avec tracing
+
+
+Phase 2 — Authentification
+
+Créer les models Rust (structs) qui mappent tes tables
+Routes : POST /auth/register et POST /auth/login
+Hasher les mots de passe avec argon2
+Générer et valider des tokens JWT avec jsonwebtoken
+Middleware d'authentification pour protéger les routes
+
+
+Phase 3 — CRUD des entités principales
+Dans cet ordre logique :
+
+Utilisateur — voir/modifier son profil
+Champ + Culture — créer, lire, modifier, supprimer
+NœudCapteur — enregistrer, voir l'état
+SeuilHumidite — configurer
+
+
+Phase 4 — Données capteurs
+
+Route de réception des données d'humidité (envoyées par le capteur)
+Route de réception et stockage des images
+Routes d'historique (avec filtres par date)
+Logique de déclenchement automatique de l'irrigation si seuil franchi
+
+
+Phase 5 — Pipeline IA
+
+Route POST /images/{id}/analyser → appelle le service Python FastAPI
+Stocker la Recommandation retournée en base
+Marquer l'image comme traitée (est_traitee = true)
+
+
+Phase 6 — Notifications
+
+Générer des notifications automatiquement (humidité critique, recommandation reçue)
+Routes pour les lire et les marquer comme lues
+
+
+Phase 7 — Finalisation
+
+Configurer le CORS pour le frontend mobile
+Documenter les routes (ex: avec utoipa pour générer un Swagger)
+Tester tous les endpoints (avec le client REST de VS Code ou Postman)
+Variables d'environnement propres pour la prod

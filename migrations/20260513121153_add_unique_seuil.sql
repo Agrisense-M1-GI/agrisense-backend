@@ -1,0 +1,1 @@
+ALTER TABLE seuils_humidite ADD CONSTRAINT unique_seuil_utilisateur UNIQUE (utilisateur_id);

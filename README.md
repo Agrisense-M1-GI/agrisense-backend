@@ -82,7 +82,7 @@ Avant de commencer, assure-toi d'avoir installé :
 ### 1. Cloner le dépôt
 
 ```bash
-git clone https://github.com/<org>/agrisense.git
+git clone https://github.com/Agrisense-M1-GI/agrisense-backend.git
 cd agrisense
 ```
 
