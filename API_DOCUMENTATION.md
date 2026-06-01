@@ -844,6 +844,278 @@ NoeudCapteur (indépendant, global)
 
 ---
 
+### 8️⃣ Humidité (Mesures des capteurs)
+
+#### `POST /humidite`
+Enregistre une nouvelle mesure d'humidité (appelé par le capteur).
+
+**Authentification** : ❌ Non requise (capteur envoie directement)
+
+**Contenu de la requête**
+```json
+{
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 65.5
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440040",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 65.5,
+  "date_mesure": "2026-05-13T14:30:00Z"
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Capteur introuvable
+  ```json
+  { "error": "Capteur introuvable" }
+  ```
+- `400 Bad Request` : Données invalides
+
+**Notes**
+- Si la valeur dépasse les seuils configurés, une **notification d'alerte** est automatiquement créée pour l'utilisateur
+- Les seuils sont vérifiés contre `seuils_humidite` dans la base de données
+
+---
+
+#### `GET /humidite/:capteur_id`
+Récupère l'historique des mesures d'humidité d'un capteur.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Paramètres de requête (optionnels)**
+- `debut` (DateTime ISO 8601) : Date/heure de début du filtre (ex: `2026-05-01T00:00:00Z`)
+- `fin` (DateTime ISO 8601) : Date/heure de fin du filtre (ex: `2026-05-13T23:59:59Z`)
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440040",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "valeur": 65.5,
+    "date_mesure": "2026-05-13T14:30:00Z"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440041",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "valeur": 68.2,
+    "date_mesure": "2026-05-13T15:00:00Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Capteur introuvable
+
+**Exemples d'appels**
+```bash
+# Toutes les mesures
+curl -X GET http://localhost:8000/api/humidite/550e8400-e29b-41d4-a716-446655440020 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Mesures du mois de mai 2026
+curl -X GET "http://localhost:8000/api/humidite/550e8400-e29b-41d4-a716-446655440020?debut=2026-05-01T00:00:00Z&fin=2026-05-31T23:59:59Z" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Limite** : Retourne les 500 dernières mesures pour éviter de surcharger la réponse
+
+---
+
+#### `GET /humidite/:capteur_id/derniere`
+Récupère la **dernière mesure d'humidité** d'un capteur (la plus récente).
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440041",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 68.2,
+  "date_mesure": "2026-05-13T15:00:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Aucune mesure disponible pour ce capteur
+  ```json
+  { "error": "Aucune mesure disponible" }
+  ```
+
+**Utilité** : Utile pour afficher rapidement l'état actuel d'humidité sans charger tout l'historique
+
+---
+
+### 9️⃣ Images (Captures des capteurs)
+
+#### `POST /images`
+Enregistre une nouvelle image capturée par un capteur.
+
+**Authentification** : ❌ Non requise (capteur envoie directement)
+
+**Contenu de la requête**
+```json
+{
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "code": "IMG_20260513_143000",
+  "longueur": 1920,
+  "largeur": 1080,
+  "chemin_stockage": "/storage/capteurs/550e8400/IMG_20260513_143000.jpg",
+  "taille_octets": 2048576,
+  "format": "jpg"
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440050",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "code": "IMG_20260513_143000",
+  "longueur": 1920,
+  "largeur": 1080,
+  "chemin_stockage": "/storage/capteurs/550e8400/IMG_20260513_143000.jpg",
+  "taille_octets": 2048576,
+  "format": "jpg",
+  "date_capture": "2026-05-13T14:30:00Z",
+  "est_traitee": false,
+  "created_at": "2026-05-13T14:30:01Z"
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Capteur introuvable
+  ```json
+  { "error": "Capteur introuvable" }
+  ```
+- `400 Bad Request` : Données invalides
+
+**Notes**
+- `est_traitee` est `false` par défaut (l'image doit être analysée par le modèle IA)
+- Le `chemin_stockage` peut être un chemin absolu ou une URL S3
+
+---
+
+#### `GET /images/:capteur_id`
+Récupère l'historique de toutes les images d'un capteur.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440050",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "code": "IMG_20260513_143000",
+    "longueur": 1920,
+    "largeur": 1080,
+    "chemin_stockage": "/storage/capteurs/550e8400/IMG_20260513_143000.jpg",
+    "taille_octets": 2048576,
+    "format": "jpg",
+    "date_capture": "2026-05-13T14:30:00Z",
+    "est_traitee": true,
+    "created_at": "2026-05-13T14:30:01Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Capteur introuvable
+
+**Notes** : Les images sont retournées en ordre décroissant par date de capture (les plus récentes en premier)
+
+---
+
+#### `GET /images/:capteur_id/non-traitees`
+Récupère les **images non traitées** (pas encore analysées par le modèle IA) d'un capteur.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440050",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "code": "IMG_20260513_150000",
+    "longueur": 1920,
+    "largeur": 1080,
+    "chemin_stockage": "/storage/capteurs/550e8400/IMG_20260513_150000.jpg",
+    "taille_octets": 2048576,
+    "format": "jpg",
+    "date_capture": "2026-05-13T15:00:00Z",
+    "est_traitee": false,
+    "created_at": "2026-05-13T15:00:01Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Aucune image non traitée ou capteur introuvable
+
+**Utilité** : Permet de récupérer la liste des images en attente de traitement pour un pipeline IA/ML
+
+**Notes** : Les images sont retournées en ordre croissant par date de capture (les plus anciennes en premier)
+
+---
+
+#### `GET /images/detail/:id`
+Récupère les détails d'une image spécifique.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant de l'image
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440050",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "code": "IMG_20260513_143000",
+  "longueur": 1920,
+  "largeur": 1080,
+  "chemin_stockage": "/storage/capteurs/550e8400/IMG_20260513_143000.jpg",
+  "taille_octets": 2048576,
+  "format": "jpg",
+  "date_capture": "2026-05-13T14:30:00Z",
+  "est_traitee": true,
+  "created_at": "2026-05-13T14:30:01Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Image introuvable
+  ```json
+  { "error": "Image introuvable" }
+  ```
+
+---
+
 ## 📝 Notes supplémentaires
 
 - **Tous les timestamps** sont en UTC (Coordinated Universal Time)
@@ -852,4 +1124,6 @@ NoeudCapteur (indépendant, global)
 - **Les mises à jour partielles** sont supportées (utiliser COALESCE côté serveur)
 - **CORS** est activé pour accepter les requêtes depuis n'importe quelle origine
 - **Isolation des données** : Chaque utilisateur ne peut accéder qu'à ses propres données (champs, cultures, seuils)
+- **Capteurs et mesures** : Les endpoints `/humidite` et `/images` sont publics pour permettre aux capteurs d'envoyer des données sans authentification
+- **Seuils d'humidité** : À chaque nouvelle mesure d'humidité, un contrôle automatique génère des notifications si les seuils sont dépassés
 

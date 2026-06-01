@@ -9,6 +9,8 @@ mod cultures;
 mod health;
 mod seuils;
 mod utilisateurs;
+mod humidite;
+mod images;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -16,7 +18,11 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/health", get(health::health_handler))
         // Auth — routes publiques
         .route("/auth/register", post(auth::register))
-        .route("/auth/login",    post(auth::login));
+        .route("/auth/login",    post(auth::login))
+        .route("/humidite",      post(humidite::recevoir_mesure))   // ← capteur envoie sans auth
+        .route("/images",        post(images::recevoir_image));      // ← capteur envoie sans auth
+
+
     
     let protected = Router::new()
         // Utilisateur
@@ -42,6 +48,12 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/seuils",  get(seuils::get_seuil))
         .route("/seuils",  post(seuils::upsert_seuil))
         // Applique le middleware JWT sur toutes les routes protégées
+        .route("/humidite/:capteur_id",         get(humidite::get_historique))
+        .route("/humidite/:capteur_id/derniere", get(humidite::get_derniere_mesure))
+        // Images
+        .route("/images/:capteur_id",                get(images::get_historique_images))
+        .route("/images/:capteur_id/non-traitees",   get(images::get_images_non_traitees))
+        .route("/images/detail/:id",                 get(images::get_image))
         .route_layer(middleware::from_fn_with_state(state, require_auth));
 
     Router::new()

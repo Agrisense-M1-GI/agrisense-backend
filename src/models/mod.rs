@@ -179,3 +179,56 @@ pub struct SeuilHumiditePayload {
     pub valeur_max:      f64,
     pub irrigation_auto: Option<bool>,
 }   
+
+// ════════════════════════════════════════════
+// DONNEE HUMIDITE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct DonneeHumidite {
+    pub id:               Uuid,
+    pub noeud_capteur_id: Uuid,
+    pub valeur:           f64,
+    pub date_mesure:      DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DonneeHumiditePayload {
+    pub noeud_capteur_id: Uuid,
+    pub valeur:           f64,
+}
+
+// Filtre de période pour l'historique
+#[derive(Debug, Deserialize)]
+pub struct PeriodeQuery {
+    pub debut: Option<DateTime<Utc>>,
+    pub fin:   Option<DateTime<Utc>>,
+}
+
+// ════════════════════════════════════════════
+// IMAGE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct Image {
+    pub id:               Uuid,
+    pub noeud_capteur_id: Uuid,
+    pub code:             Option<String>,
+    pub longueur:         Option<i32>,
+    pub largeur:          Option<i32>,
+    pub chemin_stockage:  Option<String>,
+    pub taille_octets:    Option<i64>,
+    pub format:           Option<String>,
+    pub date_capture:     DateTime<Utc>,
+    pub est_traitee:      bool,
+    pub created_at:       DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImagePayload {
+    pub noeud_capteur_id: Uuid,
+    pub code:             Option<String>,
+    pub longueur:         Option<i32>,
+    pub largeur:          Option<i32>,
+    pub chemin_stockage:  Option<String>,
+    pub taille_octets:    Option<i64>,
+    pub format:           Option<String>,
+}
