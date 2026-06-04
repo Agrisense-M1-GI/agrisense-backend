@@ -204,9 +204,9 @@ agrisense/
 ## Roadmap
 
 - [x] Phase 1 — Fondations (Axum, SQLx, AppState, erreurs, logs)
-- [ ] Phase 2 — Authentification (register, login, JWT)
-- [ ] Phase 3 — CRUD entités (Utilisateur, Champ, Culture, Capteur)
-- [ ] Phase 4 — Données capteurs (humidité, images, historiques)
+- [x] Phase 2 — Authentification (register, login, JWT)
+- [x] Phase 3 — CRUD entités (Utilisateur, Champ, Culture, Capteur)
+- [x] Phase 4 — Données capteurs (humidité, images, historiques)
 - [ ] Phase 5 — Pipeline IA (analyse image → recommandation)
 - [ ] Phase 6 — Notifications
 - [ ] Phase 7 — Finalisation (CORS, Swagger, tests)

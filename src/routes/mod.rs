@@ -11,6 +11,7 @@ mod seuils;
 mod utilisateurs;
 mod humidite;
 mod images;
+mod temperature;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -19,9 +20,9 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Auth — routes publiques
         .route("/auth/register", post(auth::register))
         .route("/auth/login",    post(auth::login))
-        .route("/humidite",      post(humidite::recevoir_mesure))   // ← capteur envoie sans auth
-        .route("/images",        post(images::recevoir_image));      // ← capteur envoie sans auth
-
+        .route("/humidite",      post(humidite::recevoir_mesure))
+        .route("/images",        post(images::recevoir_image))
+        .route("/temperature", post(temperature::recevoir_mesure));
 
     
     let protected = Router::new()
@@ -54,6 +55,8 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/images/:capteur_id",                get(images::get_historique_images))
         .route("/images/:capteur_id/non-traitees",   get(images::get_images_non_traitees))
         .route("/images/detail/:id",                 get(images::get_image))
+        .route("/temperature/:capteur_id",          get(temperature::get_historique))
+        .route("/temperature/:capteur_id/derniere", get(temperature::get_derniere_mesure))
         .route_layer(middleware::from_fn_with_state(state, require_auth));
 
     Router::new()

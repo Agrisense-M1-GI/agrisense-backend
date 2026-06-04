@@ -232,3 +232,20 @@ pub struct ImagePayload {
     pub taille_octets:    Option<i64>,
     pub format:           Option<String>,
 }
+
+// ════════════════════════════════════════════
+// DONNEE TEMPERATURE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct DonneeTemperature {
+    pub id:               Uuid,
+    pub noeud_capteur_id: Uuid,
+    pub valeur:           f64,
+    pub date_mesure:      DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DonneeTemperaturePayload {
+    pub noeud_capteur_id: Uuid,
+    pub valeur:           f64,
+}

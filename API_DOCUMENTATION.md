@@ -1116,6 +1116,122 @@ Récupère les détails d'une image spécifique.
 
 ---
 
+### 🔟 Température (Mesures des capteurs)
+
+#### `POST /temperature`
+Enregistre une nouvelle mesure de température (appelé par le capteur).
+
+**Authentification** : ❌ Non requise (capteur envoie directement)
+
+**Contenu de la requête**
+```json
+{
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 22.5
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440060",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 22.5,
+  "date_mesure": "2026-06-04T14:30:00Z"
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Capteur introuvable
+  ```json
+  { "error": "Capteur introuvable" }
+  ```
+- `400 Bad Request` : Données invalides
+
+**Notes**
+- La température est enregistrée en degrés Celsius
+- Chaque mesure est associée à un timestamp automatique
+
+---
+
+#### `GET /temperature/:capteur_id`
+Récupère l'historique des mesures de température d'un capteur.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Paramètres de requête (optionnels)**
+- `debut` (DateTime ISO 8601) : Date/heure de début du filtre (ex: `2026-06-01T00:00:00Z`)
+- `fin` (DateTime ISO 8601) : Date/heure de fin du filtre (ex: `2026-06-04T23:59:59Z`)
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440060",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "valeur": 22.5,
+    "date_mesure": "2026-06-04T14:30:00Z"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440061",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "valeur": 23.1,
+    "date_mesure": "2026-06-04T15:00:00Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Capteur introuvable
+
+**Exemples d'appels**
+```bash
+# Toutes les mesures
+curl -X GET http://localhost:8000/api/temperature/550e8400-e29b-41d4-a716-446655440020 \
+  -H "Authorization: Bearer $TOKEN"
+
+# Mesures du 4 juin 2026
+curl -X GET "http://localhost:8000/api/temperature/550e8400-e29b-41d4-a716-446655440020?debut=2026-06-04T00:00:00Z&fin=2026-06-04T23:59:59Z" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Limite** : Retourne les 500 dernières mesures pour éviter de surcharger la réponse
+
+---
+
+#### `GET /temperature/:capteur_id/derniere`
+Récupère la **dernière mesure de température** d'un capteur (la plus récente).
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `capteur_id` (UUID) : Identifiant du capteur
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440061",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "valeur": 23.1,
+  "date_mesure": "2026-06-04T15:00:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Aucune mesure disponible pour ce capteur
+  ```json
+  { "error": "Aucune mesure disponible" }
+  ```
+
+**Utilité** : Utile pour afficher rapidement la température actuelle sans charger tout l'historique
+
+---
+
 ## 📝 Notes supplémentaires
 
 - **Tous les timestamps** sont en UTC (Coordinated Universal Time)
@@ -1124,6 +1240,6 @@ Récupère les détails d'une image spécifique.
 - **Les mises à jour partielles** sont supportées (utiliser COALESCE côté serveur)
 - **CORS** est activé pour accepter les requêtes depuis n'importe quelle origine
 - **Isolation des données** : Chaque utilisateur ne peut accéder qu'à ses propres données (champs, cultures, seuils)
-- **Capteurs et mesures** : Les endpoints `/humidite` et `/images` sont publics pour permettre aux capteurs d'envoyer des données sans authentification
+- **Capteurs et mesures** : Les endpoints `/humidite`, `/temperature` et `/images` sont publics pour permettre aux capteurs d'envoyer des données sans authentification
 - **Seuils d'humidité** : À chaque nouvelle mesure d'humidité, un contrôle automatique génère des notifications si les seuils sont dépassés
 
