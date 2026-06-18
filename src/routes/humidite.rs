@@ -35,12 +35,13 @@ pub async fn recevoir_mesure(
     let mesure = sqlx::query_as!(
         DonneeHumidite,
         r#"
-        INSERT INTO donnees_humidite (noeud_capteur_id, valeur)
-        VALUES ($1, $2)
-        RETURNING id, noeud_capteur_id, valeur, date_mesure
+        INSERT INTO donnees_humidite (noeud_capteur_id, valeur, type_humidite)
+        VALUES ($1, $2, $3)
+        RETURNING id, noeud_capteur_id, valeur, type_humidite, date_mesure
         "#,
         payload.noeud_capteur_id,
         payload.valeur,
+        payload.type_humidite,
     )
     .fetch_one(&state.db)
     .await?;
@@ -63,7 +64,7 @@ pub async fn get_historique(
     let mesures = sqlx::query_as!(
         DonneeHumidite,
         r#"
-        SELECT id, noeud_capteur_id, valeur, date_mesure
+        SELECT id, noeud_capteur_id, valeur, type_humidite, date_mesure
         FROM donnees_humidite
         WHERE noeud_capteur_id = $1
           AND ($2::timestamptz IS NULL OR date_mesure >= $2)
@@ -92,10 +93,10 @@ pub async fn get_derniere_mesure(
     let mesure = sqlx::query_as!(
         DonneeHumidite,
         r#"
-        SELECT id, noeud_capteur_id, valeur, date_mesure
+        SELECT id, noeud_capteur_id, valeur, type_humidite, date_mesure
         FROM donnees_humidite
         WHERE noeud_capteur_id = $1
-        ORDER BY date_mesure DESC
+        ORDER BY type_humidite, date_mesure DESC
         LIMIT 1
         "#,
         capteur_id,

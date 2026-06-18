@@ -12,6 +12,8 @@ mod utilisateurs;
 mod humidite;
 mod images;
 mod temperature;
+pub mod node;
+mod capture;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -44,11 +46,12 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/capteurs",          get(capteurs::get_capteurs))
         .route("/capteurs",          post(capteurs::create_capteur))
         .route("/capteurs/:id",      get(capteurs::get_capteur))
+        .route("/capteurs/:id",      put(capteurs::update_capteur))
+        .route("/capteurs/:id",      delete(capteurs::delete_capteur))
         .route("/capteurs/:id/etat", patch(capteurs::update_etat_capteur))
         // Seuils
         .route("/seuils",  get(seuils::get_seuil))
         .route("/seuils",  post(seuils::upsert_seuil))
-        // Applique le middleware JWT sur toutes les routes protégées
         .route("/humidite/:capteur_id",         get(humidite::get_historique))
         .route("/humidite/:capteur_id/derniere", get(humidite::get_derniere_mesure))
         // Images
@@ -57,9 +60,15 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/images/detail/:id",                 get(images::get_image))
         .route("/temperature/:capteur_id",          get(temperature::get_historique))
         .route("/temperature/:capteur_id/derniere", get(temperature::get_derniere_mesure))
+        // Demandes de capture
+        .route("/capturer",              post(capture::demander_capture))
+        .route("/capturer/historique",   get(capture::historique_captures))
+        .route("/capturer/:job_id",      get(capture::statut_capture))
+        // Applique le middleware JWT sur toutes les routes protégées
         .route_layer(middleware::from_fn_with_state(state, require_auth));
 
     Router::new()
         .merge(public)
         .merge(protected)
+        
 }

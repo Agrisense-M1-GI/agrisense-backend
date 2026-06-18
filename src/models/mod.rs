@@ -188,6 +188,7 @@ pub struct DonneeHumidite {
     pub id:               Uuid,
     pub noeud_capteur_id: Uuid,
     pub valeur:           f64,
+    pub type_humidite:    String,
     pub date_mesure:      DateTime<Utc>,
 }
 
@@ -195,6 +196,7 @@ pub struct DonneeHumidite {
 pub struct DonneeHumiditePayload {
     pub noeud_capteur_id: Uuid,
     pub valeur:           f64,
+    pub type_humidite:    Option<String>,
 }
 
 // Filtre de période pour l'historique
@@ -248,4 +250,55 @@ pub struct DonneeTemperature {
 pub struct DonneeTemperaturePayload {
     pub noeud_capteur_id: Uuid,
     pub valeur:           f64,
+}
+
+// ════════════════════════════════════════════
+// NODE UPLOAD
+// ════════════════════════════════════════════
+#[derive(Debug, Deserialize)]
+pub struct MetricsPayload {
+    pub humidity:    Option<f64>,
+    pub temperature: Option<f64>,
+    pub battery:     Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ModeUpdate {
+    pub mode: String,   // "NORMAL" ou "MAINTENANCE"
+}
+
+#[derive(Debug, Serialize)]
+pub struct ModeResponse {
+    pub node_id: String,
+    pub mode:    String,
+}
+
+// ════════════════════════════════════════════
+// DEMANDE CAPTURE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DemandeCaptureDb {
+    pub id:             Uuid,
+    pub utilisateur_id: Uuid,
+    pub node_id:        String,
+    pub statut:         String,
+    pub image_id:       Option<Uuid>,
+    pub message_erreur: Option<String>,
+    pub created_at:     DateTime<Utc>,
+    pub updated_at:     DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DemandeCapture {
+    pub id:         Uuid,
+    pub node_id:    String,
+    pub statut:     String,
+    pub image_url:  Option<String>,   // URL directe si terminée
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DemandeCapturePayload {
+    pub node_id: String,
 }

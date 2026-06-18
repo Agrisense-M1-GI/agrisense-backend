@@ -9,7 +9,8 @@ edition = "2024"
 axum = { version = "0.7", features = ["json", "multipart"] }  # multipart pour upload images
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+serialport = "4.3"
 
 # ── Base de données ──────────────────────────────────────────
 sqlx = { version = "0.7", features = [

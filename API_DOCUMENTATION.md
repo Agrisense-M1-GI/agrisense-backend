@@ -622,6 +622,87 @@ Crée un nouveau capteur (nœud capteur).
 
 ---
 
+#### `PUT /capteurs/:id`
+Met à jour complètement un capteur existant.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant du capteur
+
+**Contenu de la requête**
+```json
+{
+  "nom": "Capteur Nord-Ouest (Modifié)",
+  "type_capteur": "Humidité + Température + Lumière",
+  "longitude": 1.2500,
+  "latitude": 47.5850,
+  "batterie": 90,
+  "surface_couverte": 3.0
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440020",
+  "nom": "Capteur Nord-Ouest (Modifié)",
+  "type_capteur": "Humidité + Température + Lumière",
+  "longitude": 1.2500,
+  "latitude": 47.5850,
+  "batterie": 90,
+  "etat": "actif",
+  "surface_couverte": 3.0,
+  "derniere_connexion": "2026-05-13T12:45:00Z",
+  "created_at": "2026-05-10T10:00:00Z",
+  "updated_at": "2026-05-13T15:00:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Capteur introuvable
+  ```json
+  { "error": "Capteur introuvable" }
+  ```
+- `400 Bad Request` : Données invalides
+
+**Notes**
+- Cet endpoint met à jour TOUS les champs du capteur (sauf l'ID, created_at, derniere_connexion)
+- L'updated_at est automatiquement mis à jour au timestamp actuel
+
+---
+
+#### `DELETE /capteurs/:id`
+Supprime un capteur du système.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant du capteur
+
+**Réponse (200 OK)**
+```json
+{
+  "message": "Capteur supprimé avec succès",
+  "id": "550e8400-e29b-41d4-a716-446655440020"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Capteur introuvable
+  ```json
+  { "error": "Capteur introuvable" }
+  ```
+
+**Notes**
+- La suppression est permanente
+- Attention : Toutes les mesures et images associées au capteur peuvent être conservées en base de données
+- Les demandes de capture en cours liées à ce capteur peuvent être affectées
+
+---
+
 #### `PATCH /capteurs/:id/etat`
 Met à jour l'état d'un capteur (appelé par le capteur lui-même).
 
@@ -1232,6 +1313,723 @@ Récupère la **dernière mesure de température** d'un capteur (la plus récent
 
 ---
 
+### 1️⃣1️⃣ Demandes de Capture
+
+> ℹ️ **Contexte technique** : La capture d'image implique une communication LoRa entre la station de base (Arduino) et le nœud capteur (Raspberry Pi). Ce processus se déroule en deux phases :
+> - **Phase 1 (rapide ~5s)** : La commande `CMD:CAPTURE` est envoyée via LoRa. Le nœud répond avec un ACK.
+> - **Phase 2 (variable)** : Le nœud prend la photo, la traite et l'envoie via HTTP. Cela peut prendre plusieurs dizaines de secondes.
+>
+> C'est pourquoi la capture utilise un **système de polling** : le frontend crée une demande, reçoit un `job_id`, puis interroge régulièrement le statut jusqu'à réception de l'image.
+
+---
+
+#### `POST /capturer`
+Crée une nouvelle demande de capture d'image pour un nœud capteur.
+
+**Authentification** : ✅ Requise
+
+**Contenu de la requête**
+```json
+{
+  "node_id": "noode_first_001"
+}
+```
+
+> ⚠️ `node_id` doit correspondre exactement au champ `nom` du nœud enregistré en base de données.
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440070",
+  "node_id": "noode_first_001",
+  "statut": "en_attente",
+  "image_url": null,
+  "created_at": "2026-06-04T15:30:00Z",
+  "updated_at": "2026-06-04T15:30:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `400 Bad Request` : Une capture est déjà en cours pour ce nœud
+  ```json
+  { "error": "Une capture est déjà en cours pour ce nœud" }
+  ```
+- `500 Internal Server Error` : Port série non disponible
+  ```json
+  { "error": "Port série non disponible sur ce serveur" }
+  ```
+
+**Notes**
+- Le `statut` initial est `en_attente`
+- Il ne peut y avoir qu'une seule capture en cours par nœud
+- `image_url` est `null` jusqu'à réception de l'image
+- Timeout automatique après **2 minutes** si aucune image n'est reçue
+
+---
+
+#### `GET /capturer/historique`
+Récupère l'historique des 50 dernières demandes de capture de l'utilisateur.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440070",
+    "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+    "node_id": "noode_first_001",
+    "statut": "terminee",
+    "image_id": "550e8400-e29b-41d4-a716-446655440050",
+    "message_erreur": null,
+    "created_at": "2026-06-04T15:30:00Z",
+    "updated_at": "2026-06-04T15:32:00Z"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440071",
+    "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+    "node_id": "noode_first_001",
+    "statut": "echouee",
+    "image_id": null,
+    "message_erreur": "Nœud injoignable — pas de réponse après 3 tentatives",
+    "created_at": "2026-06-04T15:35:00Z",
+    "updated_at": "2026-06-04T15:35:15Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+
+**Statuts possibles**
+| Statut | Description |
+|--------|-------------|
+| `en_attente` | Commande envoyée via LoRa, pas encore de ACK |
+| `ack_recu` | Le nœud a confirmé la réception, photo en cours |
+| `terminee` | Image reçue, stockée et disponible |
+| `echouee` | Nœud injoignable, timeout 2min, ou erreur |
+
+---
+
+#### `GET /capturer/:job_id`
+Récupère le statut d'une demande de capture. **Utilisé pour le polling.**
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `job_id` (UUID) : Identifiant retourné par `POST /capturer`
+
+**Réponse — capture en attente**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440070",
+  "node_id": "noode_first_001",
+  "statut": "en_attente",
+  "image_url": null,
+  "created_at": "2026-06-04T15:30:00Z",
+  "updated_at": "2026-06-04T15:30:00Z"
+}
+```
+
+**Réponse — ACK reçu (photo en cours)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440070",
+  "node_id": "noode_first_001",
+  "statut": "ack_recu",
+  "image_url": null,
+  "created_at": "2026-06-04T15:30:00Z",
+  "updated_at": "2026-06-04T15:30:05Z"
+}
+```
+
+**Réponse — capture terminée**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440070",
+  "node_id": "noode_first_001",
+  "statut": "terminee",
+  "image_url": "http://192.168.1.42:8080/fichiers/noode_first_001/images/noode_first_001_20260604_153000.jpg",
+  "created_at": "2026-06-04T15:30:00Z",
+  "updated_at": "2026-06-04T15:32:00Z"
+}
+```
+
+**Réponse — capture échouée**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440070",
+  "node_id": "noode_first_001",
+  "statut": "echouee",
+  "image_url": null,
+  "created_at": "2026-06-04T15:30:00Z",
+  "updated_at": "2026-06-04T15:30:20Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Demande introuvable
+  ```json
+  { "error": "Demande introuvable" }
+  ```
+
+---
+
+## 📱 Guide d'intégration Frontend — Capture d'image
+
+Cette section explique comment implémenter la capture d'image côté frontend de bout en bout.
+
+### Flux complet
+
+```
+Utilisateur clique "Capturer"
+        │
+        ▼
+POST /api/capturer  →  reçoit { id: jobId, statut: "en_attente" }
+        │
+        ▼
+Afficher spinner "En attente du nœud..."
+        │
+        ▼
+Poll GET /api/capturer/:jobId toutes les 2 secondes
+        │
+        ├── statut: "en_attente"  →  continuer à attendre
+        ├── statut: "ack_recu"    →  afficher "Photo en cours..."
+        ├── statut: "terminee"    →  afficher l'image ✅
+        └── statut: "echouee"     →  afficher l'erreur ❌
+```
+
+---
+
+### Implémentation JavaScript (exemple complet)
+
+```javascript
+const API_BASE = 'http://192.168.1.42:8080/api';
+const TOKEN    = localStorage.getItem('token');
+
+/**
+ * Lance une capture et gère le polling jusqu'à réception de l'image.
+ * @param {string} nodeId - Identifiant du nœud (doit correspondre au nom en base)
+ * @param {function} onStatut - Callback appelé à chaque changement de statut
+ * @param {function} onTerminee - Callback appelé quand l'image est disponible
+ * @param {function} onEchouee - Callback appelé en cas d'échec
+ */
+async function demanderCapture(nodeId, onStatut, onTerminee, onEchouee) {
+
+  // ── Étape 1 : Créer la demande ──────────────────────────────
+  let jobId;
+  try {
+    const res = await fetch(`${API_BASE}/capturer`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${TOKEN}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ node_id: nodeId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      onEchouee(err.error || 'Erreur lors de la demande');
+      return;
+    }
+
+    const data = await res.json();
+    jobId = data.id;
+    onStatut('en_attente');
+
+  } catch (e) {
+    onEchouee('Impossible de contacter le serveur');
+    return;
+  }
+
+  // ── Étape 2 : Polling toutes les 2 secondes ─────────────────
+  const INTERVALLE_MS  = 2000;
+  const TIMEOUT_MAX_MS = 150000;  // 2min30 — légèrement > timeout serveur
+  const debut          = Date.now();
+
+  const poll = setInterval(async () => {
+
+    // Sécurité côté client : arrêt si trop long
+    if (Date.now() - debut > TIMEOUT_MAX_MS) {
+      clearInterval(poll);
+      onEchouee('Timeout — aucune réponse du nœud');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/capturer/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${TOKEN}` },
+      });
+
+      if (!res.ok) {
+        clearInterval(poll);
+        onEchouee('Erreur lors de la vérification du statut');
+        return;
+      }
+
+      const data = await res.json();
+      onStatut(data.statut);
+
+      // ── Capture terminée ──────────────────────────────────
+      if (data.statut === 'terminee') {
+        clearInterval(poll);
+        onTerminee(data.image_url);
+      }
+
+      // ── Capture échouée ───────────────────────────────────
+      if (data.statut === 'echouee') {
+        clearInterval(poll);
+        onEchouee('Le nœud n\'a pas répondu ou une erreur est survenue');
+      }
+
+    } catch (e) {
+      // Erreur réseau temporaire — on continue à poller
+      console.warn('Erreur réseau temporaire, nouvelle tentative...', e);
+    }
+
+  }, INTERVALLE_MS);
+}
+```
+
+---
+
+### Exemple d'utilisation avec feedback utilisateur
+
+```javascript
+// Éléments UI
+const btnCapturer  = document.getElementById('btn-capturer');
+const statusText   = document.getElementById('status-text');
+const imagePreview = document.getElementById('image-preview');
+const spinner      = document.getElementById('spinner');
+
+// Messages affichés selon le statut
+const MESSAGES_STATUT = {
+  'en_attente': '📡 Commande envoyée, attente du nœud...',
+  'ack_recu':   '📸 Nœud contacté, prise de photo en cours...',
+  'terminee':   '✅ Image reçue !',
+  'echouee':    '❌ Échec de la capture',
+};
+
+btnCapturer.addEventListener('click', async () => {
+  // Désactive le bouton pendant la capture
+  btnCapturer.disabled = true;
+  spinner.style.display = 'block';
+  imagePreview.style.display = 'none';
+
+  await demanderCapture(
+    'noode_first_001',
+
+    // onStatut — mis à jour à chaque poll
+    (statut) => {
+      statusText.textContent = MESSAGES_STATUT[statut] || statut;
+    },
+
+    // onTerminee — affiche l'image
+    (imageUrl) => {
+      spinner.style.display = 'none';
+      imagePreview.src = imageUrl;
+      imagePreview.style.display = 'block';
+      btnCapturer.disabled = false;
+    },
+
+    // onEchouee — affiche l'erreur
+    (erreur) => {
+      spinner.style.display = 'none';
+      statusText.textContent = `❌ ${erreur}`;
+      btnCapturer.disabled = false;
+    }
+  );
+});
+```
+
+---
+
+### Exemple avec React
+
+```jsx
+import { useState } from 'react';
+
+const API_BASE = 'http://192.168.1.42:8080/api';
+
+export function BoutonCapture({ nodeId, token }) {
+  const [statut,   setStatut]   = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [erreur,   setErreur]   = useState(null);
+  const [loading,  setLoading]  = useState(false);
+
+  const MESSAGES = {
+    'en_attente': '📡 Attente du nœud...',
+    'ack_recu':   '📸 Photo en cours...',
+    'terminee':   '✅ Image reçue !',
+    'echouee':    '❌ Échec',
+  };
+
+  const capturer = async () => {
+    setLoading(true);
+    setImageUrl(null);
+    setErreur(null);
+
+    // 1. Créer la demande
+    const res = await fetch(`${API_BASE}/capturer`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ node_id: nodeId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      setErreur(err.error);
+      setLoading(false);
+      return;
+    }
+
+    const { id: jobId } = await res.json();
+    setStatut('en_attente');
+
+    // 2. Polling
+    const poll = setInterval(async () => {
+      const r    = await fetch(`${API_BASE}/capturer/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await r.json();
+
+      setStatut(data.statut);
+
+      if (data.statut === 'terminee') {
+        clearInterval(poll);
+        setImageUrl(data.image_url);
+        setLoading(false);
+      }
+      if (data.statut === 'echouee') {
+        clearInterval(poll);
+        setErreur('Nœud injoignable ou timeout');
+        setLoading(false);
+      }
+    }, 2000);
+  };
+
+  return (
+    <div>
+      <button onClick={capturer} disabled={loading}>
+        {loading ? 'Capture en cours...' : '📸 Capturer une image'}
+      </button>
+
+      {statut && <p>{MESSAGES[statut]}</p>}
+      {erreur  && <p style={{ color: 'red' }}>{erreur}</p>}
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt="Capture du champ"
+          style={{ maxWidth: '100%', marginTop: 16 }}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## 🖼️ Accès aux images stockées
+
+### Comment les images sont stockées
+
+Les images capturées par les nœuds sont stockées sur le serveur dans le dossier :
+```
+data/nodes/{node_id}/images/{node_id}_{timestamp}.{extension}
+```
+
+Exemple :
+```
+data/nodes/noode_first_001/images/noode_first_001_20260604_153000.jpg
+```
+
+### Accéder à une image via HTTP
+
+Le serveur expose directement les images via la route statique `/fichiers` :
+
+```
+GET http://{IP_SERVEUR}:{PORT}/fichiers/{node_id}/images/{nom_fichier}
+```
+
+Exemple concret :
+```
+GET http://192.168.1.42:8080/fichiers/noode_first_001/images/noode_first_001_20260604_153000.jpg
+```
+
+### Accéder aux details des images via HTTP
+
+Le serveur expose directement les JSON des images via la route statique `/fichiers` :
+
+```
+GET http://{IP_SERVEUR}:{PORT}/fichiers/{node_id}/metrics/{nom_fichier}
+```
+
+Ici {nom_fichier} correspond au même nom du fichier json de l'image.
+
+Exemple concret :
+```
+GET http://192.168.1.42:8080/fichiers/noode_first_001/metrics/001_20260604_153000.json
+```
+Le nom de l'image est : noode_first_001_20260604_153000.jpg
+
+Le nom du capteur est : noode_first_001
+
+Le nom du JSON est    : 20260604_153000.json
+
+
+**Authentification** : ❌ Non requise — les images et les json sont publiquement accessibles via leur URL.
+
+> ℹ️ L'`image_url` retournée par `GET /capturer/:job_id` est déjà l'URL complète et directement utilisable dans une balise `<img>`.
+
+---
+
+### Récupérer la liste des images d'un capteur
+
+```
+GET /api/images/:capteur_id
+Authorization: Bearer <token>
+```
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440050",
+    "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+    "code": "noode_first_001_20260604_153000",
+    "chemin_stockage": "data/nodes/noode_first_001/images/noode_first_001_20260604_153000.jpg",
+    "taille_octets": 2048576,
+    "format": "jpg",
+    "date_capture": "2026-06-04T15:30:00Z",
+    "est_traitee": false,
+    "created_at": "2026-06-04T15:30:00Z"
+  }
+]
+```
+
+Pour construire l'URL d'affichage depuis `chemin_stockage` :
+```javascript
+// chemin_stockage = "data/nodes/noode_first_001/images/noode_first_001_20260604_153000.jpg"
+const imageUrl = `http://192.168.1.42:8080/fichiers/${
+  chemin_stockage.replace('data/nodes/', '')
+}`;
+// → http://192.168.1.42:8080/fichiers/noode_first_001/images/noode_first_001_20260604_153000.jpg
+```
+
+---
+
+### Récupérer une image spécifique
+
+```
+GET /api/images/detail/:id
+Authorization: Bearer <token>
+```
+
+Retourne les métadonnées complètes d'une image par son UUID.
+
+---
+
+### Images non encore analysées par l'IA
+
+```
+GET /api/images/:capteur_id/non-traitees
+Authorization: Bearer <token>
+```
+
+Retourne uniquement les images dont `est_traitee = false` — utiles pour savoir quelles images n'ont pas encore été soumises au modèle IA.
+
+---
+
+### 1️⃣2️⃣ Endpoints Nœuds (Communication Pi/Capteurs)
+
+Ces endpoints sont utilisés par les nœuds capteurs (Raspberry Pi) pour communiquer avec le backend. Ils ne nécessitent pas d'authentification puisqu'ils proviennent des appareils eux-mêmes.
+
+#### `GET /node/:node_id/mode`
+Le nœud consulte le mode de fonctionnement au démarrage.
+
+**Authentification** : ❌ Non requise
+
+**Paramètres de route**
+- `node_id` (String) : Nom/identifiant du nœud
+
+**Réponse (200 OK)**
+```json
+{
+  "node_id": "node_01",
+  "mode": "NORMAL"
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Nœud inexistant en base
+  ```json
+  { "error": "Nœud node_01 inconnu" }
+  ```
+
+**Notes**
+- Les modes possibles sont : `NORMAL`, `MAINTENANCE`
+- Appelé au démarrage du nœud pour récupérer la configuration
+
+---
+
+#### `PUT /node/mode`
+Change le mode du système (appelé depuis l'interface admin).
+
+**Authentification** : ❌ Non requise (pour l'instant)
+
+**Contenu de la requête**
+```json
+{
+  "mode": "MAINTENANCE"
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "node_id": "system",
+  "mode": "MAINTENANCE"
+}
+```
+
+**Erreurs possibles**
+- `400 Bad Request` : Mode invalide
+  ```json
+  { "error": "Mode invalide. Valeurs acceptées : NORMAL, MAINTENANCE" }
+  ```
+
+**Notes**
+- Tous les nœuds utilisent ce mode global
+- Utile pour mettre le système en maintenance sans redémarrer tous les nœuds
+
+---
+
+#### `POST /node/:node_id/upload/image`
+Le nœud envoie une image capturée (multipart/form-data).
+
+**Authentification** : ❌ Non requise
+
+**Paramètres de route**
+- `node_id` (String) : Nom/identifiant du nœud
+
+**Headers**
+```
+Content-Type: multipart/form-data
+```
+
+**Corps de la requête**
+```
+file: <fichier image>
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440050",
+  "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
+  "code": "node_01_20260604_153000",
+  "longueur": null,
+  "largeur": null,
+  "chemin_stockage": "data/nodes/node_01/images/node_01_20260604_153000.jpg",
+  "taille_octets": 2048576,
+  "format": "jpg",
+  "date_capture": null,
+  "est_traitee": false,
+  "created_at": "2026-06-04T15:30:00Z"
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Nœud inexistant en base
+  ```json
+  { "error": "Nœud node_01 inconnu" }
+  ```
+- `400 Bad Request` : Aucun fichier reçu ou erreur multipart
+  ```json
+  { "error": "Aucun fichier reçu" }
+  ```
+- `500 Internal Server Error` : Erreur d'écriture disque
+
+**Notes**
+- L'image est sauvegardée dans `data/nodes/{node_id}/images/`
+- Après réception, ferme automatiquement la demande de capture en cours
+- Le fichier est renommé au format : `{node_id}_{timestamp}.{extension}`
+- La taille est enregistrée pour le suivi de la bande passante
+
+---
+
+#### `POST /node/:node_id/upload/metrics`
+Le nœud envoie un fichier JSON contenant les mesures (humidité, température, batterie).
+
+**Authentification** : ❌ Non requise
+
+**Paramètres de route**
+- `node_id` (String) : Nom/identifiant du nœud
+
+**Headers**
+```
+Content-Type: multipart/form-data
+```
+
+**Corps de la requête**
+```
+file: <fichier JSON avec les métriques>
+```
+
+**Format du JSON de métriques**
+```json
+{
+  "humidity": 65.5,
+  "temperature": 22.3,
+  "battery": 85
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "status": "ok",
+  "node_id": "node_01",
+  "enregistre": {
+    "humidite": 65.5,
+    "temperature": 22.3,
+    "batterie": 85
+  }
+}
+```
+
+**Erreurs possibles**
+- `404 Not Found` : Nœud inexistant en base
+  ```json
+  { "error": "Nœud node_01 inconnu" }
+  ```
+- `400 Bad Request` : JSON invalide ou aucun fichier
+  ```json
+  { "error": "JSON invalide : ..." }
+  ```
+
+**Notes**
+- Le fichier brut JSON est sauvegardé dans `data/nodes/{node_id}/metrics/`
+- Après parsing et insertion en base :
+  - `humidite` → Insérée dans `donnees_humidite` (type: 'air')
+  - `temperature` → Insérée dans `donnees_temperature`
+  - `batterie` → Met à jour le champ `batterie` du nœud
+- Vérifie automatiquement les seuils d'humidité et génère des notifications si dépassement
+- Met à jour `derniere_connexion` du nœud
+
+**Statuts des seuils**
+- Si humidité < `valeur_min` → Notification d'alerte "Humidité critique (très faible)"
+- Si humidité > `valeur_max` → Notification d'alerte "Humidité excessive (très haute)"
+
+---
+
 ## 📝 Notes supplémentaires
 
 - **Tous les timestamps** sont en UTC (Coordinated Universal Time)
@@ -1242,4 +2040,3 @@ Récupère la **dernière mesure de température** d'un capteur (la plus récent
 - **Isolation des données** : Chaque utilisateur ne peut accéder qu'à ses propres données (champs, cultures, seuils)
 - **Capteurs et mesures** : Les endpoints `/humidite`, `/temperature` et `/images` sont publics pour permettre aux capteurs d'envoyer des données sans authentification
 - **Seuils d'humidité** : À chaque nouvelle mesure d'humidité, un contrôle automatique génère des notifications si les seuils sont dépassés
-

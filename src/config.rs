@@ -8,6 +8,8 @@ pub struct Config {
     pub server_port: u16,
     pub jwt_secret: String,
     pub python_ai_url: String,
+    pub serial_port:    Option<String>,
+    pub serial_baud:    u32,
 }
 
 impl Config {
@@ -26,6 +28,11 @@ impl Config {
                 .expect("JWT_SECRET manquant dans .env"),
             python_ai_url: env::var("PYTHON_AI_URL")
                 .unwrap_or_else(|_| "http://localhost:8000".to_string()),
+            serial_port:   env::var("SERIAL_PORT").ok()
+                               .filter(|s| !s.is_empty()),
+            serial_baud:   env::var("SERIAL_BAUD")
+                               .unwrap_or_else(|_| "9600".to_string())
+                               .parse().unwrap_or(9600),
         }
     }
 }
