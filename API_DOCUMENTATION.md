@@ -928,7 +928,7 @@ NoeudCapteur (indépendant, global)
 ### 8️⃣ Humidité (Mesures des capteurs)
 
 #### `POST /humidite`
-Enregistre une nouvelle mesure d'humidité (appelé par le capteur).
+Enregistre une nouvelle mesure d'humidité sol ou air (appelé par le capteur).
 
 **Authentification** : ❌ Non requise (capteur envoie directement)
 
@@ -936,7 +936,8 @@ Enregistre une nouvelle mesure d'humidité (appelé par le capteur).
 ```json
 {
   "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
-  "valeur": 65.5
+  "valeur": 65.5,
+  "type_humidite":"sol"
 }
 ```
 
@@ -946,6 +947,7 @@ Enregistre une nouvelle mesure d'humidité (appelé par le capteur).
   "id": "550e8400-e29b-41d4-a716-446655440040",
   "noeud_capteur_id": "550e8400-e29b-41d4-a716-446655440020",
   "valeur": 65.5,
+  "type_humidite":"sol",
   "date_mesure": "2026-05-13T14:30:00Z"
 }
 ```
