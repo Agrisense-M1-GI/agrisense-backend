@@ -169,6 +169,7 @@ pub struct SeuilHumidite {
     pub valeur_min:       f64,
     pub valeur_max:       f64,
     pub irrigation_auto:  bool,
+    pub type_humidite:    String,
     pub created_at:       DateTime<Utc>,
     pub updated_at:       DateTime<Utc>,
 }
@@ -178,6 +179,7 @@ pub struct SeuilHumiditePayload {
     pub valeur_min:      f64,
     pub valeur_max:      f64,
     pub irrigation_auto: Option<bool>,
+    pub type_humidite:   String,
 }   
 
 // ════════════════════════════════════════════
@@ -301,4 +303,74 @@ pub struct DemandeCapture {
 #[derive(Debug, Deserialize)]
 pub struct DemandeCapturePayload {
     pub node_id: String,
+}
+
+// ════════════════════════════════════════════
+// CHAT IA
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Conversation {
+    pub id:             Uuid,
+    pub utilisateur_id: Uuid,
+    pub titre:          Option<String>,
+    pub created_at:     DateTime<Utc>,
+    pub updated_at:     DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct MessageChat {
+    pub id:              Uuid,
+    pub conversation_id: Uuid,
+    pub role:            String,
+    pub contenu:         String,
+    pub statut:          String,
+    pub image_id:        Option<Uuid>,
+    pub created_at:      DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NouveauMessagePayload {
+    pub contenu:         String,
+    pub conversation_id: Option<Uuid>,  // None = nouvelle conversation
+    pub image_id:        Option<Uuid>,  // Image à analyser (optionnel)
+}
+
+#[derive(Debug, Serialize)]
+pub struct MessageResponse {
+    pub message_user:      MessageChat,
+    pub message_assistant: MessageChat,  // statut: en_attente jusqu'à réponse IA
+    pub conversation_id:   Uuid,
+}
+
+// Ce qu'on envoie au serveur Python
+#[derive(Debug, Serialize)]
+pub struct IaRequest {
+    pub messages:  Vec<IaMessage>,
+    pub image_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct IaMessage {
+    pub role:    String,
+    pub content: String,
+}
+
+// Ce que le serveur Python retourne
+#[derive(Debug, Deserialize)]
+pub struct IaResponse {
+    pub response: String,
+}
+
+// ════════════════════════════════════════════
+// NOTIFICATION
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Notification {
+    pub id:             Uuid,
+    pub utilisateur_id: Uuid,
+    pub r#type:         String, // "type" est un mot réservé en Rust
+    pub message:        String,
+    pub source:         Option<String>,
+    pub statut:         String,
+    pub date:           DateTime<Utc>,
 }

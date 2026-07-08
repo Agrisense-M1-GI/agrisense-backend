@@ -750,34 +750,33 @@ Met à jour l'état d'un capteur (appelé par le capteur lui-même).
 ### 7️⃣ Seuils d'Humidité
 
 #### `GET /seuils`
-Récupère le seuil d'humidité de l'utilisateur connecté.
+Récupère les seuils d'humidité de l'utilisateur connecté (un par type).
 
 **Authentification** : ✅ Requise
 
 **Réponse (200 OK)**
 ```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440030",
-  "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
-  "valeur_min": 30.0,
-  "valeur_max": 70.0,
-  "irrigation_auto": true,
-  "created_at": "2026-05-13T10:00:00Z",
-  "updated_at": "2026-05-13T10:00:00Z"
-}
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440030",
+    "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+    "valeur_min": 30.0,
+    "valeur_max": 70.0,
+    "irrigation_auto": true,
+    "type_humidite": "sol",
+    "created_at": "2026-05-13T10:00:00Z",
+    "updated_at": "2026-05-13T10:00:00Z"
+  }
+]
 ```
 
 **Erreurs possibles**
 - `401 Unauthorized` : Token absent ou invalide
-- `404 Not Found` : Aucun seuil configuré
-  ```json
-  { "error": "Aucun seuil configuré" }
-  ```
 
 ---
 
 #### `POST /seuils`
-Crée ou remplace le seuil d'humidité de l'utilisateur connecté (UPSERT).
+Crée ou remplace un seuil d'humidité pour l'utilisateur connecté (spécifique au type).
 
 **Authentification** : ✅ Requise
 
@@ -786,7 +785,8 @@ Crée ou remplace le seuil d'humidité de l'utilisateur connecté (UPSERT).
 {
   "valeur_min": 25.0,
   "valeur_max": 75.0,
-  "irrigation_auto": true
+  "irrigation_auto": true,
+  "type_humidite": "sol"
 }
 ```
 
@@ -798,6 +798,7 @@ Crée ou remplace le seuil d'humidité de l'utilisateur connecté (UPSERT).
   "valeur_min": 25.0,
   "valeur_max": 75.0,
   "irrigation_auto": true,
+  "type_humidite": "sol",
   "created_at": "2026-05-13T10:00:00Z",
   "updated_at": "2026-05-13T14:00:00Z"
 }
@@ -2029,6 +2030,218 @@ file: <fichier JSON avec les métriques>
 **Statuts des seuils**
 - Si humidité < `valeur_min` → Notification d'alerte "Humidité critique (très faible)"
 - Si humidité > `valeur_max` → Notification d'alerte "Humidité excessive (très haute)"
+
+---
+
+### 1️⃣3️⃣ Chat / Assistant IA
+
+#### `POST /chat`
+Envoie un message à l'assistant IA et lance une conversation ou en continue une.
+
+**Authentification** : ✅ Requise
+
+**Contenu de la requête**
+```json
+{
+  "contenu": "Quel est le problème avec ma plante sur cette image ?",
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440090", 
+  "image_id": "550e8400-e29b-41d4-a716-446655440050"
+}
+```
+*Note: `conversation_id` et `image_id` sont optionnels. Si `conversation_id` est omis, une nouvelle conversation est créée.*
+
+**Réponse (200 OK)**
+```json
+{
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+  "message_user": {
+    "id": "550e8400-e29b-41d4-a716-446655440091",
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+    "role": "user",
+    "contenu": "Quel est le problème avec ma plante sur cette image ?",
+    "statut": "terminee",
+    "image_id": "550e8400-e29b-41d4-a716-446655440050",
+    "created_at": "2026-07-06T12:00:00Z"
+  },
+  "message_assistant": {
+    "id": "550e8400-e29b-41d4-a716-446655440092",
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+    "role": "assistant",
+    "contenu": "",
+    "statut": "en_attente",
+    "image_id": null,
+    "created_at": "2026-07-06T12:00:01Z"
+  }
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Conversation ou image introuvable
+
+---
+
+#### `GET /chat/:message_id/statut`
+Vérifie le statut de la réponse de l'assistant (polling).
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `message_id` (UUID) : Identifiant du `message_assistant` retourné par `POST /chat`
+
+**Réponse (200 OK) — En attente**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440092",
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+  "role": "assistant",
+  "contenu": "",
+  "statut": "en_attente",
+  "image_id": null,
+  "created_at": "2026-07-06T12:00:01Z"
+}
+```
+
+**Réponse (200 OK) — Terminé**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440092",
+  "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+  "role": "assistant",
+  "contenu": "D'après l'image, il semblerait que votre plante manque d'eau.",
+  "statut": "terminee",
+  "image_id": null,
+  "created_at": "2026-07-06T12:00:01Z"
+}
+```
+
+---
+
+#### `GET /chat/conversations`
+Récupère la liste de toutes les conversations de l'utilisateur.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440090",
+    "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+    "titre": "Quel est le problème avec ma plante sur cet...",
+    "created_at": "2026-07-06T12:00:00Z",
+    "updated_at": "2026-07-06T12:00:00Z"
+  }
+]
+```
+
+---
+
+#### `GET /chat/conversations/:id`
+Récupère tous les messages d'une conversation.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant de la conversation
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440091",
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+    "role": "user",
+    "contenu": "Quel est le problème avec ma plante sur cette image ?",
+    "statut": "terminee",
+    "image_id": "550e8400-e29b-41d4-a716-446655440050",
+    "created_at": "2026-07-06T12:00:00Z"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440092",
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440090",
+    "role": "assistant",
+    "contenu": "D'après l'image, il semblerait que votre plante manque d'eau.",
+    "statut": "terminee",
+    "image_id": null,
+    "created_at": "2026-07-06T12:00:01Z"
+  }
+]
+```
+
+---
+
+#### `DELETE /chat/conversations/:id`
+Supprime une conversation et tous ses messages associés.
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant de la conversation
+
+**Réponse (200 OK)**
+```json
+{
+  "message": "Conversation supprimée"
+}
+```
+
+---
+
+### 1️⃣4️⃣ Notifications
+
+#### `GET /notifications`
+Récupère l'historique complet des notifications de l'utilisateur connecté, trié par date (les plus récentes en premier).
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440100",
+    "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+    "type": "alerte_critique",
+    "message": "L'humidité du sol est inférieure au seuil critique !",
+    "source": "humidite",
+    "statut": "non_lue",
+    "date": "2026-07-06T14:30:00Z"
+  }
+]
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+
+---
+
+#### `PATCH /notifications/:id/lue`
+Marque une notification spécifique comme lue (passe `statut` de `non_lue` à `lue`).
+
+**Authentification** : ✅ Requise
+
+**Paramètres de route**
+- `id` (UUID) : Identifiant de la notification
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440100",
+  "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "alerte_critique",
+  "message": "L'humidité du sol est inférieure au seuil critique !",
+  "source": "humidite",
+  "statut": "lue",
+  "date": "2026-07-06T14:30:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Notification introuvable (ou appartenant à un autre utilisateur)
+  ```json
+  { "error": "Notification introuvable" }
+  ```
 
 ---
 

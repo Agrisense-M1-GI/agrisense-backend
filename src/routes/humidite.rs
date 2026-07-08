@@ -47,7 +47,8 @@ pub async fn recevoir_mesure(
     .await?;
 
     // Vérifie si le seuil est franchi et crée une notification si besoin
-    verifier_seuil(&state, payload.noeud_capteur_id, payload.valeur).await?;
+    let type_humidite = mesure.type_humidite.clone();
+    verifier_seuil(&state, payload.noeud_capteur_id, payload.valeur, &type_humidite).await?;
 
     Ok(Json(mesure))
 }
@@ -108,16 +109,19 @@ pub async fn get_derniere_mesure(
     Ok(Json(mesure))
 }
 
-// Vérifie si la valeur dépasse un seuil configuré et crée une notification
+// Vérifie si la valeur dépasse le seuil configuré pour ce type d'humidité
+// et crée une notification si besoin.
 async fn verifier_seuil(
     state: &AppState,
     capteur_id: Uuid,
     valeur: f64,
+    type_humidite: &str,
 ) -> AppResult<()> {
 
-    // Récupère tous les seuils configurés
+    // Récupère uniquement les seuils configurés pour ce type d'humidité
     let seuils = sqlx::query!(
-        "SELECT utilisateur_id, valeur_min, valeur_max FROM seuils_humidite"
+        "SELECT utilisateur_id, valeur_min, valeur_max FROM seuils_humidite WHERE type_humidite = $1",
+        type_humidite
     )
     .fetch_all(&state.db)
     .await?;
@@ -126,16 +130,16 @@ async fn verifier_seuil(
         let (message, source) = if valeur < seuil.valeur_min {
             (
                 format!(
-                    "⚠️ Humidité critique ({:.1}%) sous le seuil minimum ({:.1}%) — capteur {}",
-                    valeur, seuil.valeur_min, capteur_id
+                    "⚠️ Humidité {} critique ({:.1}%) sous le seuil minimum ({:.1}%) — capteur {}",
+                    type_humidite, valeur, seuil.valeur_min, capteur_id
                 ),
                 "humidite_basse",
             )
         } else if valeur > seuil.valeur_max {
             (
                 format!(
-                    "⚠️ Humidité excessive ({:.1}%) au-dessus du seuil maximum ({:.1}%) — capteur {}",
-                    valeur, seuil.valeur_max, capteur_id
+                    "⚠️ Humidité {} excessive ({:.1}%) au-dessus du seuil maximum ({:.1}%) — capteur {}",
+                    type_humidite, valeur, seuil.valeur_max, capteur_id
                 ),
                 "humidite_haute",
             )
@@ -155,7 +159,7 @@ async fn verifier_seuil(
         .execute(&state.db)
         .await?;
 
-        tracing::warn!("🚨 Alerte humidité : {}", message);
+        tracing::warn!("🚨 Alerte humidité {} : {}", type_humidite, message);
     }
 
     Ok(())

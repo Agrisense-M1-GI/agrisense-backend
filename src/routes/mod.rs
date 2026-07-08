@@ -14,6 +14,8 @@ mod images;
 mod temperature;
 pub mod node;
 mod capture;
+mod chat;
+mod notifications;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -64,6 +66,15 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/capturer",              post(capture::demander_capture))
         .route("/capturer/historique",   get(capture::historique_captures))
         .route("/capturer/:job_id",      get(capture::statut_capture))
+        // Chat
+        .route("/chat",                              post(chat::envoyer_message))
+        .route("/chat/:message_id/statut",           get(chat::statut_message))
+        .route("/chat/conversations",                get(chat::get_conversations))
+        .route("/chat/conversations/:id",            get(chat::get_messages_conversation))
+        .route("/chat/conversations/:id",            delete(chat::delete_conversation))
+        // Notifications
+        .route("/notifications",                     get(notifications::get_notifications))
+        .route("/notifications/:id/lue",             patch(notifications::mark_as_lue))
         // Applique le middleware JWT sur toutes les routes protégées
         .route_layer(middleware::from_fn_with_state(state, require_auth));
 
