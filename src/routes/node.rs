@@ -18,6 +18,66 @@ use crate::{
 // Dossier de stockage des fichiers reçus
 const UPLOAD_DIR: &str = "data/nodes";
 
+fn build_capture_timestamp() -> String {
+    Utc::now().format("%Y%m%d_%H%M%S").to_string()
+}
+
+fn build_image_filename(node_id: &str, timestamp: &str, extension: &str) -> String {
+    format!("{}_{}.{}", node_id, timestamp, extension)
+}
+
+fn build_metrics_filename(timestamp: &str) -> String {
+    format!("{}.json", timestamp)
+}
+
+async fn resolve_capture_timestamp(state: &AppState, node_id: &str) -> AppResult<String> {
+    if let Some(code) = sqlx::query_scalar!(
+        r#"
+        SELECT code
+        FROM images
+        WHERE noeud_capteur_id = (
+            SELECT id FROM noeuds_capteurs WHERE nom = $1
+        )
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        "#,
+        node_id
+    )
+    .fetch_optional(&state.db)
+    .await?
+    {
+        if let Some(code) = code {
+            let normalized = code
+                .strip_prefix(&format!("{}_", node_id))
+                .unwrap_or(&code);
+            return Ok(normalized.to_string());
+        }
+    }
+
+    let metrics_dir = PathBuf::from(UPLOAD_DIR).join(node_id).join("metrics");
+    let mut metrics_files = Vec::new();
+
+    if let Ok(mut entries) = fs::read_dir(&metrics_dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
+                if ext.eq_ignore_ascii_case("json") {
+                    if let Some(file_name) = entry.file_name().to_str() {
+                        if let Some(stem) = file_name.strip_suffix(".json") {
+                            metrics_files.push(stem.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(latest) = metrics_files.iter().max() {
+        return Ok(latest.clone());
+    }
+
+    Ok(build_capture_timestamp())
+}
+
 // ─────────────────────────────────────────────
 // GET /api/node/:node_id/mode
 // Le Pi consulte le mode au démarrage
@@ -140,13 +200,13 @@ pub async fn upload_image(
     }
 
     // Sauvegarde sur disque
-    let timestamp  = Utc::now().format("%Y%m%d_%H%M%S").to_string();
+    let capture_timestamp = resolve_capture_timestamp(&state, &node_id).await?;
     let extension  = PathBuf::from(&original_filename)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("jpg")
         .to_string();
-    let filename   = format!("{}_{}.{}", node_id, timestamp, extension);
+    let filename   = build_image_filename(&node_id, &capture_timestamp, &extension);
     let dest       = upload_path.join(&filename);
     let chemin     = format!("{}/{}/images/{}", UPLOAD_DIR, node_id, filename);
     let taille     = file_bytes.len() as i64;
@@ -166,7 +226,7 @@ pub async fn upload_image(
                   chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
         "#,
         capteur.id,
-        format!("{}_{}", node_id, timestamp),
+        capture_timestamp,
         chemin,
         taille,
         extension,
@@ -248,8 +308,8 @@ pub async fn upload_metrics(
     }
 
     // Sauvegarde locale du fichier brut
-    let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
-    let dest      = upload_path.join(format!("{}.json", timestamp));
+    let capture_timestamp = resolve_capture_timestamp(&state, &node_id).await?;
+    let dest      = upload_path.join(build_metrics_filename(&capture_timestamp));
     let mut file  = fs::File::create(&dest).await
         .map_err(|e| AppError::Internal(format!("Erreur écriture fichier : {}", e)))?;
     file.write_all(&file_bytes).await
