@@ -44,6 +44,8 @@ pub async fn recevoir_mesure(
     .fetch_one(&state.db)
     .await?;
 
+    verifier_seuil_temperature(&state, payload.noeud_capteur_id, payload.valeur).await?;
+
     tracing::info!(
         "🌡️ Température reçue : {:.1}°C — capteur {}",
         payload.valeur,
@@ -107,4 +109,51 @@ pub async fn get_derniere_mesure(
     .ok_or_else(|| AppError::NotFound("Aucune mesure disponible".to_string()))?;
 
     Ok(Json(mesure))
+}
+
+// Ajoute cette fonction
+async fn verifier_seuil_temperature(
+    state: &AppState,
+    capteur_id: Uuid,
+    valeur: f64,
+) -> AppResult<()> {
+
+    let seuils = sqlx::query!(
+        "SELECT utilisateur_id, valeur_min, valeur_max FROM seuils_temperature"
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    for seuil in seuils {
+        let message = if valeur < seuil.valeur_min {
+            Some(format!(
+                "🌡️ Température critique ({:.1}°C) sous le seuil minimum ({:.1}°C) — capteur {}",
+                valeur, seuil.valeur_min, capteur_id
+            ))
+        } else if valeur > seuil.valeur_max {
+            Some(format!(
+                "🌡️ Température excessive ({:.1}°C) au-dessus du seuil maximum ({:.1}°C) — capteur {}",
+                valeur, seuil.valeur_max, capteur_id
+            ))
+        } else {
+            None
+        };
+
+        if let Some(msg) = message {
+            sqlx::query!(
+                r#"
+                INSERT INTO notifications (utilisateur_id, type, message, source)
+                VALUES ($1, 'alerte_critique', $2, 'temperature')
+                "#,
+                seuil.utilisateur_id,
+                msg,
+            )
+            .execute(&state.db)
+            .await?;
+
+            tracing::warn!("🚨 {}", msg);
+        }
+    }
+
+    Ok(())
 }

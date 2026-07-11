@@ -374,3 +374,22 @@ pub struct Notification {
     pub statut:         String,
     pub date:           DateTime<Utc>,
 }
+
+// ════════════════════════════════════════════
+// SEUIL TEMPERATURE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct SeuilTemperature {
+    pub id:             Uuid,
+    pub utilisateur_id: Uuid,
+    pub valeur_min:     f64,
+    pub valeur_max:     f64,
+    pub created_at:     DateTime<Utc>,
+    pub updated_at:     DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SeuilTemperaturePayload {
+    pub valeur_min: f64,
+    pub valeur_max: f64,
+}

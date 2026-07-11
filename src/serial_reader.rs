@@ -2,6 +2,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use crate::config::Config;
+use crate::errors::AppResult;
 
 // ─────────────────────────────────────────
 // Structure d'une trame parsée
@@ -115,7 +116,7 @@ fn detecter_port() -> Option<String> {
 async fn inserer_donnees(
     db: &PgPool,
     trame: &TrameNoeud,
-) -> Result<(), sqlx::Error> {
+) -> AppResult<()> {
 
     // Récupère l'UUID du capteur depuis son nom/node_id
     let capteur = sqlx::query!(
@@ -145,6 +146,9 @@ async fn inserer_donnees(
         )
         .execute(db)
         .await?;
+
+        verifier_seuil_temperature(db, capteur_id, temp).await?;
+
         tracing::info!("🌡️  Température : {}°C", temp);
     }
 
@@ -365,4 +369,50 @@ pub async fn lancer_lecteur_serie(
             }
         }
     }
+}
+
+async fn verifier_seuil_temperature(
+    db:         &sqlx::PgPool,
+    capteur_id: uuid::Uuid,
+    valeur:     f64,
+) -> AppResult<()> {
+
+    let seuils = sqlx::query!(
+        "SELECT utilisateur_id, valeur_min, valeur_max FROM seuils_temperature"
+    )
+    .fetch_all(db)
+    .await?;
+
+    for seuil in seuils {
+        let message = if valeur < seuil.valeur_min {
+            Some(format!(
+                "🌡️ Température critique ({:.1}°C) sous le seuil minimum ({:.1}°C)",
+                valeur, seuil.valeur_min
+            ))
+        } else if valeur > seuil.valeur_max {
+            Some(format!(
+                "🌡️ Température excessive ({:.1}°C) au-dessus du seuil maximum ({:.1}°C)",
+                valeur, seuil.valeur_max
+            ))
+        } else {
+            None
+        };
+
+        if let Some(msg) = message {
+            sqlx::query!(
+                r#"
+                INSERT INTO notifications (utilisateur_id, type, message, source)
+                VALUES ($1, 'alerte_critique', $2, 'temperature')
+                "#,
+                seuil.utilisateur_id,
+                msg,
+            )
+            .execute(db)
+            .await?;
+
+            tracing::warn!("🚨 {}", msg);
+        }
+    }
+
+    Ok(())
 }

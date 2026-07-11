@@ -16,6 +16,7 @@ pub mod node;
 mod capture;
 mod chat;
 mod notifications;
+mod seuils_temperature;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -56,6 +57,8 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/seuils",  post(seuils::upsert_seuil))
         .route("/humidite/:capteur_id",         get(humidite::get_historique))
         .route("/humidite/:capteur_id/derniere", get(humidite::get_derniere_mesure))
+        .route("/seuils/temperature", get(seuils_temperature::get_seuil))
+        .route("/seuils/temperature", post(seuils_temperature::upsert_seuil))
         // Images
         .route("/images/:capteur_id",                get(images::get_historique_images))
         .route("/images/:capteur_id/non-traitees",   get(images::get_images_non_traitees))

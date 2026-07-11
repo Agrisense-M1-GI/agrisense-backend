@@ -7,7 +7,7 @@
 - Les champs agricoles
 - Les cultures par champ
 - Les capteurs (nœuds capteurs) de monitoring
-- Les seuils d'humidité configurables
+- Les seuils d'humidité et de température configurables
 
 **Base URL** : `http://localhost:PORT/api`
 
@@ -813,6 +813,68 @@ Crée ou remplace un seuil d'humidité pour l'utilisateur connecté (spécifique
 
 ---
 
+### 8️⃣ Seuils de Température
+
+#### `GET /seuils/temperature`
+Récupère le seuil de température configuré pour l'utilisateur connecté.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440040",
+  "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+  "valeur_min": 10.0,
+  "valeur_max": 30.0,
+  "created_at": "2026-06-10T10:00:00Z",
+  "updated_at": "2026-06-10T10:00:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `404 Not Found` : Aucun seuil de température configuré
+  ```json
+  { "error": "Aucun seuil de température configuré" }
+  ```
+
+---
+
+#### `POST /seuils/temperature`
+Crée ou remplace le seuil de température pour l'utilisateur connecté.
+
+**Authentification** : ✅ Requise
+
+**Contenu de la requête**
+```json
+{
+  "valeur_min": 10.0,
+  "valeur_max": 30.0
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440040",
+  "utilisateur_id": "550e8400-e29b-41d4-a716-446655440000",
+  "valeur_min": 10.0,
+  "valeur_max": 30.0,
+  "created_at": "2026-06-10T10:00:00Z",
+  "updated_at": "2026-06-10T11:00:00Z"
+}
+```
+
+**Erreurs possibles**
+- `401 Unauthorized` : Token absent ou invalide
+- `400 Bad Request` : valeur_min >= valeur_max
+  ```json
+  { "error": "valeur_min doit être inférieure à valeur_max" }
+  ```
+
+---
+
 ## 🚨 Messages d'erreurs généraux
 
 ### Erreurs HTTP courantes
@@ -899,6 +961,7 @@ curl -X POST http://localhost:8000/api/seuils \
   -d '{
     "valeur_min": 30.0,
     "valeur_max": 70.0,
+    "type_humidite": "sol",
     "irrigation_auto": true
   }'
 ```
@@ -912,7 +975,7 @@ curl -X POST http://localhost:8000/api/seuils \
 Utilisateur
   ├── Champ (1:N)
   │   └── Culture (1:N)
-  └── SeuilHumidite (1:1)
+  └── SeuilHumidite (1:2)
 
 NoeudCapteur (indépendant, global)
 ```
@@ -1235,6 +1298,8 @@ Enregistre une nouvelle mesure de température (appelé par le capteur).
 **Notes**
 - La température est enregistrée en degrés Celsius
 - Chaque mesure est associée à un timestamp automatique
+- Si la température dépasse les seuils configurés, une notification d'alerte est automatiquement créée pour l'utilisateur
+- Les seuils sont vérifiés à partir de la table `seuils_temperature`
 
 ---
 
@@ -2024,12 +2089,14 @@ file: <fichier JSON avec les métriques>
   - `humidite` → Insérée dans `donnees_humidite` (type: 'air')
   - `temperature` → Insérée dans `donnees_temperature`
   - `batterie` → Met à jour le champ `batterie` du nœud
-- Vérifie automatiquement les seuils d'humidité et génère des notifications si dépassement
+- Vérifie automatiquement les seuils d'humidité et de température et génère des notifications si dépassement
 - Met à jour `derniere_connexion` du nœud
 
 **Statuts des seuils**
 - Si humidité < `valeur_min` → Notification d'alerte "Humidité critique (très faible)"
 - Si humidité > `valeur_max` → Notification d'alerte "Humidité excessive (très haute)"
+- Si température < `valeur_min` → Notification d'alerte "Température critique (très basse)"
+- Si température > `valeur_max` → Notification d'alerte "Température excessive (très haute)"
 
 ---
 
