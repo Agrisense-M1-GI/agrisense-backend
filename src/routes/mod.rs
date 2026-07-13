@@ -17,6 +17,7 @@ mod capture;
 mod chat;
 mod notifications;
 mod seuils_temperature;
+mod recommandations;
 
 pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public =Router::new()
@@ -25,9 +26,14 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Auth — routes publiques
         .route("/auth/register", post(auth::register))
         .route("/auth/login",    post(auth::login))
-        .route("/humidite",      post(humidite::recevoir_mesure))
+        // Images et donnees scalaires du noeud capteur
         .route("/images",        post(images::recevoir_image))
-        .route("/temperature", post(temperature::recevoir_mesure));
+        .route("/humidite",      post(humidite::recevoir_mesure))
+        .route("/temperature",   post(temperature::recevoir_mesure))
+        // appelle par le modele IA
+        .route("/ia/callback/image",     post(recommandations::callback_image))
+        .route("/ia/callback/metriques", post(recommandations::callback_metriques))
+        .route("/ia/metrics-source",     get(recommandations::metrics_source));
 
     
     let protected = Router::new()
@@ -78,6 +84,18 @@ pub fn all_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Notifications
         .route("/notifications",                     get(notifications::get_notifications))
         .route("/notifications/:id/lue",             patch(notifications::mark_as_lue))
+        // Recommandation
+        .route("/recommandations",                 get(recommandations::get_recommandations))
+        .route("/recommandations/non-lues",        get(recommandations::get_recommandations_non_lues))
+        .route("/recommandations/tout-lire",       patch(recommandations::tout_marquer_lue))
+        .route("/recommandations/:id",             get(recommandations::get_recommandation))
+        .route("/recommandations/:id/lue",         patch(recommandations::marquer_lue))
+        .route("/recommandations/:id",             delete(recommandations::delete_recommandation))
+        // Analyses journalieres
+        .route("/analyses",                        get(recommandations::get_analyses))
+        .route("/analyses/aujourd-hui",            get(recommandations::get_analyse_aujourd_hui))
+        .route("/analyses/:id",                    get(recommandations::get_analyse))
+        .route("/analyses/:id/lue",                patch(recommandations::marquer_analyse_lue))
         // Applique le middleware JWT sur toutes les routes protégées
         .route_layer(middleware::from_fn_with_state(state, require_auth));
 

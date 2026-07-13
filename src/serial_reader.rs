@@ -373,7 +373,7 @@ pub async fn lancer_lecteur_serie(
 
 async fn verifier_seuil_temperature(
     db:         &sqlx::PgPool,
-    capteur_id: uuid::Uuid,
+    _capteur_id: uuid::Uuid,
     valeur:     f64,
 ) -> AppResult<()> {
 

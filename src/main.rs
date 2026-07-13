@@ -14,6 +14,7 @@ mod models;
 mod routes;
 mod middlewares;
 mod serial_reader;
+mod scheduler;
 
 // État partagé injecté dans toutes les routes
 #[derive(Clone)]
@@ -76,6 +77,15 @@ async fn main() {
     ));
 
     tracing::info!("📡 Lecteur série démarré en arrière-plan");
+
+    // Scheduler 
+    let config_sched  = config.clone();
+    let client_sched  = reqwest::Client::new();
+    tokio::spawn(async move {
+        scheduler::lancer_scheduler(config_sched, client_sched).await;
+    });
+
+    tracing::info!("⏰ Scheduler démarré");
 
     let app = Router::new()
         .nest("/api", routes::all_routes(state.clone()))

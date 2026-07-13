@@ -37,7 +37,7 @@ pub async fn recevoir_image(
         INSERT INTO images (noeud_capteur_id, code, longueur, largeur, chemin_stockage, taille_octets, format)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, noeud_capteur_id, code, longueur, largeur,
-                  chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
+              chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         "#,
         payload.noeud_capteur_id,
         payload.code,
@@ -64,8 +64,8 @@ pub async fn get_historique_images(
     let images = sqlx::query_as!(
         Image,
         r#"
-        SELECT id, noeud_capteur_id, code, longueur, largeur,
-               chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
+         SELECT id, noeud_capteur_id, code, longueur, largeur,
+             chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         FROM images
         WHERE noeud_capteur_id = $1
         ORDER BY date_capture DESC
@@ -89,8 +89,8 @@ pub async fn get_images_non_traitees(
     let images = sqlx::query_as!(
         Image,
         r#"
-        SELECT id, noeud_capteur_id, code, longueur, largeur,
-               chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
+         SELECT id, noeud_capteur_id, code, longueur, largeur,
+             chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         FROM images
         WHERE noeud_capteur_id = $1 AND est_traitee = FALSE
         ORDER BY date_capture ASC
@@ -114,8 +114,8 @@ pub async fn get_image(
     let image = sqlx::query_as!(
         Image,
         r#"
-        SELECT id, noeud_capteur_id, code, longueur, largeur,
-               chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
+         SELECT id, noeud_capteur_id, code, longueur, largeur,
+             chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         FROM images WHERE id = $1
         "#,
         id,

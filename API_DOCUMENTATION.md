@@ -1227,6 +1227,10 @@ Récupère les **images non traitées** (pas encore analysées par le modèle IA
 
 **Notes** : Les images sont retournées en ordre croissant par date de capture (les plus anciennes en premier)
 
+**Notes IA**
+- `est_traitee` passe à `true` après réception d'un callback IA d'analyse d'image.
+- `model_image_id` est utilisé pour relier une image locale au résultat de traitement retourné par le service Python.
+
 ---
 
 #### `GET /images/detail/:id`
@@ -2255,7 +2259,303 @@ Supprime une conversation et tous ses messages associés.
 
 ---
 
-### 1️⃣4️⃣ Notifications
+### 1️⃣4️⃣ Recommandations et analyses IA
+
+#### `POST /ia/callback/image`
+Webhook appelé par le service Python lorsqu'une analyse d'image est terminée.
+
+**Authentification** : ❌ Non requise
+
+**Contenu de la requête**
+```json
+{
+  "image_id": "550e8400-e29b-41d4-a716-446655440050",
+  "sensor_id": "NODE01",
+  "etat": "alerte",
+  "actions": "Arroser le sol et vérifier l'état des feuilles",
+  "priorite": "haute"
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440110",
+  "image_id": "550e8400-e29b-41d4-a716-446655440050",
+  "sensor_id": "NODE01",
+  "etat": "alerte",
+  "actions_texte": "Arroser le sol et vérifier l'état des feuilles",
+  "actions": null,
+  "priorite": "haute",
+  "est_lue": false,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+**Notes**
+- Le backend relie le résultat au modèle local grâce à `model_image_id`.
+- L'image correspondante est marquée comme traitée (`est_traitee = true`).
+
+---
+
+#### `POST /ia/callback/metriques`
+Webhook appelé par le service Python lorsqu'une analyse journalière des métriques est terminée.
+
+**Authentification** : ❌ Non requise
+
+**Contenu de la requête**
+```json
+{
+  "etat": "alerte",
+  "actions": "Vérifier l'humidité du sol et ajuster l'irrigation",
+  "priorite": "moyenne"
+}
+```
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440111",
+  "date_jour": "2026-07-06",
+  "etat": "alerte",
+  "contenu": "Vérifier l'humidité du sol et ajuster l'irrigation",
+  "priorite": "moyenne",
+  "est_lue": false,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+**Notes**
+- Si une analyse existe déjà pour la journée, elle est mise à jour via `UPSERT`.
+
+---
+
+#### `GET /ia/metrics-source`
+Retourne les métriques récentes requises par le service Python pour produire une analyse journalière.
+
+**Authentification** : ❌ Non requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "humidity": 65.8,
+    "soil_humidity": 42.1,
+    "air_temp": 24.6,
+    "timestamp": "2026-07-06T12:00:00Z"
+  }
+]
+```
+
+**Notes**
+- Les valeurs sont récupérées sur les dernières 24 heures et servent de source d'entrée au modèle IA.
+
+---
+
+#### `GET /recommandations`
+Récupère les recommandations IA les plus récentes.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440110",
+    "image_id": "550e8400-e29b-41d4-a716-446655440050",
+    "sensor_id": "NODE01",
+    "etat": "alerte",
+    "actions_texte": "Arroser le sol et vérifier l'état des feuilles",
+    "actions": null,
+    "priorite": "haute",
+    "est_lue": false,
+    "created_at": "2026-07-06T13:00:00Z"
+  }
+]
+```
+
+---
+
+#### `GET /recommandations/non-lues`
+Retourne uniquement les recommandations non lues.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440110",
+    "image_id": "550e8400-e29b-41d4-a716-446655440050",
+    "sensor_id": "NODE01",
+    "etat": "alerte",
+    "actions_texte": "Arroser le sol et vérifier l'état des feuilles",
+    "actions": null,
+    "priorite": "haute",
+    "est_lue": false,
+    "created_at": "2026-07-06T13:00:00Z"
+  }
+]
+```
+
+---
+
+#### `GET /recommandations/:id`
+Récupère une recommandation précise.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440110",
+  "image_id": "550e8400-e29b-41d4-a716-446655440050",
+  "sensor_id": "NODE01",
+  "etat": "alerte",
+  "actions_texte": "Arroser le sol et vérifier l'état des feuilles",
+  "actions": null,
+  "priorite": "haute",
+  "est_lue": false,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+---
+
+#### `PATCH /recommandations/:id/lue`
+Marque une recommandation comme lue.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440110",
+  "image_id": "550e8400-e29b-41d4-a716-446655440050",
+  "sensor_id": "NODE01",
+  "etat": "alerte",
+  "actions_texte": "Arroser le sol et vérifier l'état des feuilles",
+  "actions": null,
+  "priorite": "haute",
+  "est_lue": true,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+---
+
+#### `PATCH /recommandations/tout-lire`
+Marque toutes les recommandations non lues comme lues.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "message": "Recommandations marquées comme lues",
+  "nombre": 3
+}
+```
+
+---
+
+#### `DELETE /recommandations/:id`
+Supprime une recommandation.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "message": "Recommandation supprimée"
+}
+```
+
+---
+
+#### `GET /analyses`
+Récupère les analyses journalières disponibles.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440111",
+    "date_jour": "2026-07-06",
+    "etat": "alerte",
+    "contenu": "Vérifier l'humidité du sol et ajuster l'irrigation",
+    "priorite": "moyenne",
+    "est_lue": false,
+    "created_at": "2026-07-06T13:00:00Z"
+  }
+]
+```
+
+---
+
+#### `GET /analyses/aujourd-hui`
+Récupère l'analyse du jour courant si elle existe.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440111",
+  "date_jour": "2026-07-06",
+  "etat": "alerte",
+  "contenu": "Vérifier l'humidité du sol et ajuster l'irrigation",
+  "priorite": "moyenne",
+  "est_lue": false,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+---
+
+#### `GET /analyses/:id`
+Récupère une analyse quotidienne précise.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440111",
+  "date_jour": "2026-07-06",
+  "etat": "alerte",
+  "contenu": "Vérifier l'humidité du sol et ajuster l'irrigation",
+  "priorite": "moyenne",
+  "est_lue": false,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+---
+
+#### `PATCH /analyses/:id/lue`
+Marque une analyse journalière comme lue.
+
+**Authentification** : ✅ Requise
+
+**Réponse (200 OK)**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440111",
+  "date_jour": "2026-07-06",
+  "etat": "alerte",
+  "contenu": "Vérifier l'humidité du sol et ajuster l'irrigation",
+  "priorite": "moyenne",
+  "est_lue": true,
+  "created_at": "2026-07-06T13:00:00Z"
+}
+```
+
+---
+
+### 1️⃣5️⃣ Notifications
 
 #### `GET /notifications`
 Récupère l'historique complet des notifications de l'utilisateur connecté, trié par date (les plus récentes en premier).

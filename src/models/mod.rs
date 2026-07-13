@@ -223,6 +223,7 @@ pub struct Image {
     pub format:           Option<String>,
     pub date_capture:     DateTime<Utc>,
     pub est_traitee:      bool,
+    pub model_image_id:   Option<String>,
     pub created_at:       DateTime<Utc>,
 }
 
@@ -392,4 +393,62 @@ pub struct SeuilTemperature {
 pub struct SeuilTemperaturePayload {
     pub valeur_min: f64,
     pub valeur_max: f64,
+}
+
+// ════════════════════════════════════════════
+// RECOMMANDATION (mise à jour)
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Recommandation {
+    pub id:            Uuid,
+    pub image_id:      Uuid,
+    pub sensor_id:     Option<String>,
+    pub etat:          Option<String>,      // "normal", "alerte", "critique"
+    pub actions_texte: Option<String>,      // texte libre retourné par l'IA
+    pub actions:       Option<serde_json::Value>,
+    pub priorite:      Option<String>,      // "basse", "moyenne", "haute"
+    pub est_lue:       bool,
+    pub created_at:    DateTime<Utc>,
+}
+
+// Callback reçu du service Python — résultat image
+#[derive(Debug, Deserialize)]
+pub struct CallbackImagePayload {
+    pub image_id:  String,
+    pub sensor_id: String,
+    pub etat:      String,
+    pub actions:   String,
+    pub priorite:  String,
+}
+
+// ════════════════════════════════════════════
+// ANALYSE JOURNALIERE
+// ════════════════════════════════════════════
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct AnalyseJournaliere {
+    pub id:        Uuid,
+    pub date_jour: chrono::NaiveDate,
+    pub etat:      Option<String>,
+    pub contenu:   Option<String>,
+    pub priorite:  Option<String>,
+    pub est_lue:   bool,
+    pub created_at: DateTime<Utc>,
+}
+
+// Callback reçu du service Python — résultat métriques
+#[derive(Debug, Deserialize)]
+pub struct CallbackMetriquesPayload {
+    pub etat:     String,
+    pub actions:  String,
+    pub priorite: String,
+}
+
+// Ce que le service Python vient lire sur notre backend
+// GET /api/ia/metrics-source
+#[derive(Debug, Serialize)]
+pub struct MetriqueSource {
+    pub humidity:   f64,
+    pub air_temp:   f64,
+    pub soil_temp:  Option<f64>,
+    pub timestamp:  String,
 }

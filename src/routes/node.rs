@@ -78,6 +78,107 @@ async fn resolve_capture_timestamp(state: &AppState, node_id: &str) -> AppResult
     Ok(build_capture_timestamp())
 }
 
+pub async fn appeler_analyse_visuelle(
+    http_client: reqwest::Client,
+    ai_url:      String,
+    server_host: String,
+    server_port: u16,
+    image_id:    String,
+    node_id:     String,
+    chemin:      String,
+    db:          sqlx::PgPool,
+) {
+    // Lit le fichier image depuis le disque
+    let image_path = std::path::Path::new(&chemin);
+    let file_bytes = match tokio::fs::read(image_path).await {
+        Ok(b)  => b,
+        Err(e) => {
+            tracing::error!("❌ Impossible de lire l'image {} : {}", chemin, e);
+            return;
+        }
+    };
+
+    // URL du callback que le service Python appellera avec le résultat
+    let callback_url = format!(
+        "http://{}:{}/api/ia/callback/image",
+        server_host, server_port
+    );
+
+    // Construit le multipart — format attendu par POST /analyze-image
+    let filename  = image_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("image.jpg")
+        .to_string();
+
+    let part = reqwest::multipart::Part::bytes(file_bytes)
+        .file_name(filename)
+        .mime_str("image/jpeg")
+        .unwrap();
+
+    let form = reqwest::multipart::Form::new()
+        .part("image", part)
+        .text("sensor_id", node_id.clone())
+        // On passe le callback_url en champ texte supplémentaire
+        // Le service Python doit le lire dans sa config (BACKEND_IMAGE_RESULT_URL)
+        // mais on le passe aussi ici pour référence
+        .text("callback_url", callback_url);
+
+    match http_client
+        .post(format!("{}/analyze-image", ai_url))
+        .multipart(form)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+    {
+        Ok(res) if res.status().is_success() => {
+            match res.json::<serde_json::Value>().await {
+                Ok(body) => {
+                    // Récupère l'image_id généré par le service Python
+                    if let Some(model_image_id) = body
+                        .get("image_id")
+                        .and_then(|v| v.as_str())
+                    {
+                        tracing::info!(
+                            "📤 Analyse IA lancée — model_image_id: {}",
+                            model_image_id
+                        );
+
+                        // Sauvegarde le model_image_id dans notre table images
+                        // pour faire le lien lors du callback
+                        let our_id = match uuid::Uuid::parse_str(&image_id) {
+                            Ok(id) => id,
+                            Err(_) => {
+                                tracing::error!("❌ UUID image invalide : {}", image_id);
+                                return;
+                            }
+                        };
+
+                        if let Err(e) = sqlx::query!(
+                            "UPDATE images SET model_image_id = $1 WHERE id = $2",
+                            model_image_id,
+                            our_id,
+                        )
+                        .execute(&db)
+                        .await
+                        {
+                            tracing::error!("❌ Erreur sauvegarde model_image_id : {}", e);
+                        } else {
+                            tracing::info!(
+                                "✅ model_image_id {} lié à notre image {}",
+                                model_image_id, image_id
+                            );
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("❌ Erreur parsing réponse IA : {}", e),
+            }
+        }
+        Ok(res) => tracing::error!("❌ Erreur service IA : {}", res.status()),
+        Err(e)  => tracing::error!("❌ Service IA injoignable : {}", e),
+    }
+}
+
 // ─────────────────────────────────────────────
 // GET /api/node/:node_id/mode
 // Le Pi consulte le mode au démarrage
@@ -223,7 +324,7 @@ pub async fn upload_image(
         INSERT INTO images (noeud_capteur_id, code, chemin_stockage, taille_octets, format)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, noeud_capteur_id, code, longueur, largeur,
-                  chemin_stockage, taille_octets, format, date_capture, est_traitee, created_at
+              chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         "#,
         capteur.id,
         capture_timestamp,
@@ -250,6 +351,29 @@ pub async fn upload_image(
     .await?;
 
     tracing::info!("✅ Job de capture fermé pour nœud {}", node_id);
+
+    // Lance l'analyse IA en arrière-plan
+    let db_clone     = state.db.clone();
+    let http_client  = state.http_client.clone();
+    let ai_url       = state.config.python_ai_url.clone();
+    let server_host  = state.config.server_host.clone();
+    let server_port  = state.config.server_port;
+    let image_id_str = image.id.to_string();
+    let node_id_str = node_id.clone();
+
+    tokio::spawn(async move {
+        appeler_analyse_visuelle(
+            http_client,
+            ai_url,
+            server_host,
+            server_port,
+            image_id_str,
+            node_id_str,
+            chemin.clone(),
+            db_clone,
+        )
+        .await;
+    });
 
     tracing::info!(
         "🖼️  Image reçue du nœud {} → {} ({} octets)",

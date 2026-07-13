@@ -40,6 +40,7 @@ dotenvy = "0.15"                      # fichier .env
 thiserror = "1"                       # erreurs typées
 anyhow = "1"                          # erreurs génériques
 validator = { version = "0.18", features = ["derive"] }  # validation des inputs
+tokio-cron-scheduler = "0.10"           # plannification de taches
 
 # ── Logs ─────────────────────────────────────────────────────
 tracing = "0.1"
