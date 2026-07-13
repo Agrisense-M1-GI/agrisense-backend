@@ -2,9 +2,9 @@ use axum::{
     extract::{Multipart, Path, State},
     Json,
 };
-use std::{sync::Arc, path::PathBuf};
+use std::{collections::HashSet, sync::Arc, path::PathBuf};
 use tokio::{fs, io::AsyncWriteExt};
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 
 use crate::{
     errors::{AppError, AppResult},
@@ -31,31 +31,8 @@ fn build_metrics_filename(timestamp: &str) -> String {
 }
 
 async fn resolve_capture_timestamp(state: &AppState, node_id: &str) -> AppResult<String> {
-    if let Some(code) = sqlx::query_scalar!(
-        r#"
-        SELECT code
-        FROM images
-        WHERE noeud_capteur_id = (
-            SELECT id FROM noeuds_capteurs WHERE nom = $1
-        )
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-        "#,
-        node_id
-    )
-    .fetch_optional(&state.db)
-    .await?
-    {
-        if let Some(code) = code {
-            let normalized = code
-                .strip_prefix(&format!("{}_", node_id))
-                .unwrap_or(&code);
-            return Ok(normalized.to_string());
-        }
-    }
-
     let metrics_dir = PathBuf::from(UPLOAD_DIR).join(node_id).join("metrics");
-    let mut metrics_files = Vec::new();
+    let mut metrics_files = HashSet::new();
 
     if let Ok(mut entries) = fs::read_dir(&metrics_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
@@ -63,7 +40,7 @@ async fn resolve_capture_timestamp(state: &AppState, node_id: &str) -> AppResult
                 if ext.eq_ignore_ascii_case("json") {
                     if let Some(file_name) = entry.file_name().to_str() {
                         if let Some(stem) = file_name.strip_suffix(".json") {
-                            metrics_files.push(stem.to_string());
+                            metrics_files.insert(stem.to_string());
                         }
                     }
                 }
@@ -307,6 +284,7 @@ pub async fn upload_image(
         .and_then(|e| e.to_str())
         .unwrap_or("jpg")
         .to_string();
+    let image_code = format!("{}_{}", node_id, capture_timestamp);
     let filename   = build_image_filename(&node_id, &capture_timestamp, &extension);
     let dest       = upload_path.join(&filename);
     let chemin     = format!("{}/{}/images/{}", UPLOAD_DIR, node_id, filename);
@@ -327,7 +305,7 @@ pub async fn upload_image(
               chemin_stockage, taille_octets, format, date_capture, est_traitee, model_image_id, created_at
         "#,
         capteur.id,
-        capture_timestamp,
+        image_code,
         chemin,
         taille,
         extension,

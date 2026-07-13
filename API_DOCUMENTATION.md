@@ -1835,23 +1835,28 @@ Exemple concret :
 GET http://192.168.1.42:8080/fichiers/noode_first_001/images/noode_first_001_20260604_153000.jpg
 ```
 
-### Accéder aux details des images via HTTP
+### Accéder aux détails des images via HTTP
 
-Le serveur expose directement les JSON des images via la route statique `/fichiers` :
+Le serveur expose directement les JSON des métriques via la route statique `/fichiers` :
 
 ```
 GET http://{IP_SERVEUR}:{PORT}/fichiers/{node_id}/metrics/{nom_fichier}
 ```
 
-Ici {nom_fichier} correspond au même nom du fichier json de l'image.
+Ici `{nom_fichier}` correspond au timestamp du fichier JSON.
 
 Exemple concret :
 ```
-GET http://192.168.1.42:8080/fichiers/noode_first_001/metrics/001_20260604_153000.json
+GET http://192.168.1.42:8080/fichiers/noode_first_001/metrics/20260604_153000.json
 ```
-Le nom de l'image est : noode_first_001_20260604_153000.jpg
 
-Le nom du capteur est : noode_first_001
+- Le nom de l'image est : `noode_first_001_20260604_153000.jpg`
+- Le nom du capteur est : `noode_first_001`
+- Le nom du JSON est : `20260604_153000.json`
+
+**Authentification** : ❌ Non requise — les images et les JSON sont publiquement accessibles via leur URL.
+
+> ℹ️ L'`image_url` retournée par `GET /capturer/:job_id` est déjà l'URL complète et directement utilisable dans une balise `<img>`.
 
 Le nom du JSON est    : 20260604_153000.json
 

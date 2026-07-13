@@ -345,21 +345,14 @@ pub struct MessageResponse {
 
 // Ce qu'on envoie au serveur Python
 #[derive(Debug, Serialize)]
-pub struct IaRequest {
-    pub messages:  Vec<IaMessage>,
-    pub image_url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct IaMessage {
-    pub role:    String,
-    pub content: String,
+pub struct IaChatRequest {
+    pub question: String,
 }
 
 // Ce que le serveur Python retourne
 #[derive(Debug, Deserialize)]
-pub struct IaResponse {
-    pub response: String,
+pub struct IaChatResponse {
+    pub answer: String,
 }
 
 // ════════════════════════════════════════════

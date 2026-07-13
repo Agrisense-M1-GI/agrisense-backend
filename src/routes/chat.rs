@@ -9,7 +9,7 @@ use crate::{
     errors::{AppError, AppResult},
     middlewares::auth::Claims,
     models::{
-        Conversation, IaMessage, IaRequest, IaResponse,
+        Conversation, IaChatRequest, IaChatResponse,
         MessageChat, MessageResponse, NouveauMessagePayload,
     },
     AppState,
@@ -96,40 +96,6 @@ pub async fn envoyer_message(
     let http_client = state.http_client.clone();
     let ai_url      = state.config.python_ai_url.clone();
 
-    // Récupère l'historique de la conversation pour le contexte
-    let historique = sqlx::query_as!(
-        MessageChat,
-        r#"
-        SELECT * FROM messages_chat
-        WHERE conversation_id = $1
-          AND statut = 'terminee'
-          AND role   = 'user'
-        ORDER BY created_at ASC
-        "#,
-        conversation_id,
-    )
-    .fetch_all(&state.db)
-    .await?;
-
-    // URL de l'image si fournie
-    let image_url = if let Some(img_id) = payload.image_id {
-        sqlx::query_scalar!(
-            "SELECT chemin_stockage FROM images WHERE id = $1",
-            img_id
-        )
-        .fetch_optional(&state.db)
-        .await?
-        .flatten()
-        .map(|chemin| format!(
-            "http://{}:{}/fichiers/{}",
-            state.config.server_host,
-            state.config.server_port,
-            chemin.replace("data/nodes/", "")
-        ))
-    } else {
-        None
-    };
-
     // Tâche background — appel au modèle Python
     tokio::spawn(async move {
         appeler_modele_ia(
@@ -137,9 +103,7 @@ pub async fn envoyer_message(
             http_client,
             ai_url,
             message_assistant_id,
-            historique,
             payload.contenu,
-            image_url,
         )
         .await;
     });
@@ -159,28 +123,10 @@ async fn appeler_modele_ia(
     http_client:         reqwest::Client,
     ai_url:              String,
     message_assistant_id: Uuid,
-    historique:          Vec<MessageChat>,
     nouveau_message:     String,
-    image_url:           Option<String>,
 ) {
-    // Construit l'historique pour le contexte
-    let mut messages: Vec<IaMessage> = historique
-        .into_iter()
-        .map(|m| IaMessage {
-            role:    m.role,
-            content: m.contenu,
-        })
-        .collect();
-
-    // Ajoute le nouveau message
-    messages.push(IaMessage {
-        role:    "user".to_string(),
-        content: nouveau_message,
-    });
-
-    let ia_request = IaRequest {
-        messages,
-        image_url,
+    let ia_request = IaChatRequest {
+        question: nouveau_message,
     };
 
     // Appelle le serveur Python
@@ -193,7 +139,7 @@ async fn appeler_modele_ia(
 
     match result {
         Ok(response) if response.status().is_success() => {
-            match response.json::<IaResponse>().await {
+            match response.json::<IaChatResponse>().await {
                 Ok(ia_response) => {
                     // Met à jour le message avec la réponse
                     let _ = sqlx::query!(
@@ -202,7 +148,7 @@ async fn appeler_modele_ia(
                         SET contenu = $1, statut = 'terminee'
                         WHERE id = $2
                         "#,
-                        ia_response.response,
+                        ia_response.answer,
                         message_assistant_id,
                     )
                     .execute(&db)

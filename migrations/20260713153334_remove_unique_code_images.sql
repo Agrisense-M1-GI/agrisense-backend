@@ -1,0 +1,1 @@
+ALTER TABLE images DROP CONSTRAINT IF EXISTS images_code_key;
