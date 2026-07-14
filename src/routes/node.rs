@@ -2,9 +2,9 @@ use axum::{
     extract::{Multipart, Path, State},
     Json,
 };
-use std::{collections::HashSet, sync::Arc, path::PathBuf};
+use std::{sync::Arc, path::PathBuf};
 use tokio::{fs, io::AsyncWriteExt};
-use chrono::{NaiveDateTime, Utc};
+use chrono::Local;
 
 use crate::{
     errors::{AppError, AppResult},
@@ -18,41 +18,8 @@ use crate::{
 // Dossier de stockage des fichiers reçus
 const UPLOAD_DIR: &str = "data/nodes";
 
-fn build_capture_timestamp() -> String {
-    Utc::now().format("%Y%m%d_%H%M%S").to_string()
-}
-
-fn build_image_filename(node_id: &str, timestamp: &str, extension: &str) -> String {
-    format!("{}_{}.{}", node_id, timestamp, extension)
-}
-
-fn build_metrics_filename(timestamp: &str) -> String {
-    format!("{}.json", timestamp)
-}
-
-async fn resolve_capture_timestamp(state: &AppState, node_id: &str) -> AppResult<String> {
-    let metrics_dir = PathBuf::from(UPLOAD_DIR).join(node_id).join("metrics");
-    let mut metrics_files = HashSet::new();
-
-    if let Ok(mut entries) = fs::read_dir(&metrics_dir).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
-                if ext.eq_ignore_ascii_case("json") {
-                    if let Some(file_name) = entry.file_name().to_str() {
-                        if let Some(stem) = file_name.strip_suffix(".json") {
-                            metrics_files.insert(stem.to_string());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if let Some(latest) = metrics_files.iter().max() {
-        return Ok(latest.clone());
-    }
-
-    Ok(build_capture_timestamp())
+fn build_capture_timestamp_ms() -> String {
+    Local::now().format("%Y%m%d_%H%M%S_%3f").to_string()  // ex: 20260714_123456_789
 }
 
 pub async fn appeler_analyse_visuelle(
@@ -278,14 +245,14 @@ pub async fn upload_image(
     }
 
     // Sauvegarde sur disque
-    let capture_timestamp = resolve_capture_timestamp(&state, &node_id).await?;
+    let capture_timestamp = build_capture_timestamp_ms();
     let extension  = PathBuf::from(&original_filename)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("jpg")
         .to_string();
     let image_code = format!("{}_{}", node_id, capture_timestamp);
-    let filename   = build_image_filename(&node_id, &capture_timestamp, &extension);
+    let filename   = format!("{}_{}.{}", node_id, capture_timestamp, extension);
     let dest       = upload_path.join(&filename);
     let chemin     = format!("{}/{}/images/{}", UPLOAD_DIR, node_id, filename);
     let taille     = file_bytes.len() as i64;
@@ -312,6 +279,9 @@ pub async fn upload_image(
     )
     .fetch_one(&state.db)
     .await?;
+
+    // Mémorise le timestamp pour le prochain upload de métriques
+    state.last_image_timestamp.write().await.insert(node_id.clone(), capture_timestamp);
 
     // Après l'insertion de l'image en base, ferme le job de capture en cours
     sqlx::query!(
@@ -410,8 +380,15 @@ pub async fn upload_metrics(
     }
 
     // Sauvegarde locale du fichier brut
-    let capture_timestamp = resolve_capture_timestamp(&state, &node_id).await?;
-    let dest      = upload_path.join(build_metrics_filename(&capture_timestamp));
+    let capture_timestamp = state.last_image_timestamp.read().await
+        .get(&node_id)
+        .cloned()
+        .ok_or_else(|| AppError::BadRequest(
+            format!("Aucune image préalable reçue pour le nœud {}", node_id)
+        ))?;
+
+    let filename = format!("{}.json", capture_timestamp);
+    let dest = upload_path.join(&filename);
     let mut file  = fs::File::create(&dest).await
         .map_err(|e| AppError::Internal(format!("Erreur écriture fichier : {}", e)))?;
     file.write_all(&file_bytes).await

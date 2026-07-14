@@ -439,6 +439,7 @@ pub struct CallbackMetriquesPayload {
 // Ce que le service Python vient lire sur notre backend
 // GET /api/ia/metrics-source
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct MetriqueSource {
     pub humidity:   f64,
     pub air_temp:   f64,

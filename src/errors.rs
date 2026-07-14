@@ -12,6 +12,7 @@ pub enum AppError {
     Unauthorized,
 
     #[error("Accès interdit")]
+    #[allow(dead_code)]
     Forbidden,
 
     #[error("Ressource introuvable : {0}")]

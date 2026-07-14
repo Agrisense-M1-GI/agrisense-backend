@@ -6,6 +6,8 @@ use tower_http::cors::{CorsLayer, Any};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tokio::sync::mpsc;
+use tokio::sync::RwLock;
+use std::collections::HashMap;
 
 mod config;
 mod db;
@@ -23,6 +25,7 @@ pub struct AppState {
     pub config: Arc<config::Config>,
     pub http_client: reqwest::Client,
     pub serial_tx:   Option<mpsc::Sender<String>>,  // canal vers le port série
+    pub last_image_timestamp: Arc<RwLock<HashMap<String, String>>>,
 }
 
 #[tokio::main]
@@ -61,6 +64,7 @@ async fn main() {
         config: config.clone(),
         http_client: reqwest::Client::new(),
         serial_tx:   Some(serial_tx),
+        last_image_timestamp: Arc::new(RwLock::new(HashMap::new())),
     });
 
     // CORS

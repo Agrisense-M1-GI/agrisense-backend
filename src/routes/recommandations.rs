@@ -87,7 +87,7 @@ pub async fn callback_metriques(
     Json(payload): Json<CallbackMetriquesPayload>,
 ) -> AppResult<Json<AnalyseJournaliere>> {
 
-    let aujourd_hui = chrono::Utc::now().date_naive();
+    let aujourd_hui = chrono::Local::now().date_naive();
 
     // Upsert — si une analyse existe déjà aujourd'hui, on la met à jour
     let analyse = sqlx::query_as!(
@@ -320,7 +320,7 @@ pub async fn get_analyse_aujourd_hui(
     Extension(_claims): Extension<Claims>,
 ) -> AppResult<Json<AnalyseJournaliere>> {
 
-    let aujourd_hui = chrono::Utc::now().date_naive();
+    let aujourd_hui = chrono::Local::now().date_naive();
 
     let analyse = sqlx::query_as!(
         AnalyseJournaliere,
